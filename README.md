@@ -147,9 +147,9 @@ pnpm tauri build --bundles nsis,msi
 pnpm tauri build --bundles deb,appimage
 ```
 
-构建产物位于 `src-tauri/target/release/bundle/`。推送 tag `v*` 会触发发布工作流，为 macOS、Windows、Linux 构建产物，并上传到对应 GitHub Release。
+构建产物位于 `src-tauri/target/release/bundle/`。推送 tag `v*` 会触发发布工作流，为 macOS、Windows、Linux 构建安装包，并只将 `.dmg`、`.deb`、`.AppImage`、`.exe`、`.msi` 上传到对应 GitHub Release。
 
-Build artifacts are written to `src-tauri/target/release/bundle/`. Pushing a `v*` tag triggers the release workflow, builds artifacts for macOS, Windows, and Linux, and uploads them to the matching GitHub Release.
+Build artifacts are written to `src-tauri/target/release/bundle/`. Pushing a `v*` tag triggers the release workflow, builds installers for macOS, Windows, and Linux, and uploads only `.dmg`, `.deb`, `.AppImage`, `.exe`, and `.msi` files to the matching GitHub Release.
 
 ## 各平台安装与启动 / Install and Launch on Each Platform
 
