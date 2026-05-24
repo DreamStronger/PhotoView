@@ -29,6 +29,15 @@ pub struct AppPathsDto {
 impl AppPaths {
     pub fn initialize<R: Runtime>(app: &AppHandle<R>) -> AppResult<Self> {
         let app_data_dir = app.path().app_data_dir().map_err(AppError::from)?;
+        Self::from_app_data_dir(app_data_dir)
+    }
+
+    #[cfg(test)]
+    pub fn initialize_at(app_data_dir: PathBuf) -> AppResult<Self> {
+        Self::from_app_data_dir(app_data_dir)
+    }
+
+    fn from_app_data_dir(app_data_dir: PathBuf) -> AppResult<Self> {
         let database_path = app_data_dir.join("photoview.sqlite");
         let thumbnails_dir = app_data_dir.join("thumbnails");
         let tasks_dir = app_data_dir.join("tasks");

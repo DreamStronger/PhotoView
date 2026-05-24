@@ -182,3 +182,127 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
     Menu::with_items(app, &[&file, &edit, &window, &help])
 }
+
+#[cfg(test)]
+mod command_tests {
+    use super::*;
+    use serde_json::{json, Value};
+    use std::{fs, path::PathBuf};
+    use tauri::{
+        ipc::{CallbackFn, InvokeBody},
+        test::{mock_builder, mock_context, noop_assets, MockRuntime, INVOKE_KEY},
+        webview::InvokeRequest,
+        Webview, WebviewWindowBuilder,
+    };
+
+    fn temp_app_data_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("photoview-{name}-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).expect("test app data dir should be created");
+        dir
+    }
+
+    fn create_command_app(app_data_dir: PathBuf) -> tauri::App<MockRuntime> {
+        let state = app::AppState::initialize_for_test(app_data_dir)
+            .expect("test app state should initialize");
+
+        mock_builder()
+            .manage(state)
+            .invoke_handler(tauri::generate_handler![
+                get_app_status,
+                list_collections,
+                get_settings,
+                update_setting,
+            ])
+            .build(mock_context(noop_assets()))
+            .expect("test app should build")
+    }
+
+    fn invoke_json<W: AsRef<Webview<MockRuntime>>>(
+        webview: &W,
+        cmd: &str,
+        body: Value,
+    ) -> Result<Value, Value> {
+        tauri::test::get_ipc_response(
+            webview,
+            InvokeRequest {
+                cmd: cmd.into(),
+                callback: CallbackFn(0),
+                error: CallbackFn(1),
+                url: if cfg!(any(windows, target_os = "android")) {
+                    "http://tauri.localhost"
+                } else {
+                    "tauri://localhost"
+                }
+                .parse()
+                .expect("invoke url should parse"),
+                body: InvokeBody::Json(body),
+                headers: Default::default(),
+                invoke_key: INVOKE_KEY.to_string(),
+            },
+        )
+        .map(|body| {
+            body.deserialize::<Value>()
+                .expect("command response should be valid json")
+        })
+    }
+
+    #[test]
+    fn tauri_commands_report_status_and_collections() {
+        let app_data_dir = temp_app_data_dir("status");
+        let app = create_command_app(app_data_dir.clone());
+        let webview = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .expect("test webview should build");
+
+        let status = invoke_json(&webview, "get_app_status", json!({}))
+            .expect("status command should succeed");
+        assert_eq!(status["product_name"], "PhotoView");
+        assert_eq!(status["collection_count"], 0);
+        assert_eq!(status["image_count"], 0);
+
+        let collections = invoke_json(&webview, "list_collections", json!({}))
+            .expect("collections command should succeed");
+        assert_eq!(collections.as_array().map(Vec::len), Some(0));
+
+        drop(webview);
+        drop(app);
+        fs::remove_dir_all(app_data_dir).expect("test app data dir should be removed");
+    }
+
+    #[test]
+    fn tauri_commands_update_and_list_settings() {
+        let app_data_dir = temp_app_data_dir("settings");
+        let app = create_command_app(app_data_dir.clone());
+        let webview = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .expect("test webview should build");
+
+        let updated = invoke_json(
+            &webview,
+            "update_setting",
+            json!({
+                "request": {
+                    "key": "theme",
+                    "value": "dark"
+                }
+            }),
+        )
+        .expect("update setting command should succeed");
+        assert_eq!(updated["key"], "theme");
+        assert_eq!(updated["value"], "dark");
+
+        let settings = invoke_json(&webview, "get_settings", json!({}))
+            .expect("settings command should succeed");
+        let theme = settings
+            .as_array()
+            .expect("settings should be an array")
+            .iter()
+            .find(|setting| setting["key"] == "theme")
+            .expect("theme setting should exist");
+        assert_eq!(theme["value"], "dark");
+
+        drop(webview);
+        drop(app);
+        fs::remove_dir_all(app_data_dir).expect("test app data dir should be removed");
+    }
+}

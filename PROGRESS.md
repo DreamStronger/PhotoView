@@ -3,8 +3,8 @@
 ## Current
 
 - 阶段：阶段 5，质量、性能与发布。
-- 正在做：阶段 5 性能优化已完成实现层面的调整。
-- 下一步：推进测试补充、跨平台 CI 和打包发布配置。
+- 正在做：阶段 5 本地 QA、CI 和发布配置已完成。
+- 下一步：提交并推送后观察 GitHub Actions，完成 Windows、macOS、Linux 跨平台冒烟。
 
 ## Done
 
@@ -69,8 +69,17 @@
 - 已完成设置默认值兼容：前端会兼容历史 JSON 字符串形式的设置值，避免主题、语言和缩略图尺寸被带引号的默认值污染。
 - 已完成本轮验证：`pnpm build` 通过，`cargo fmt --check` 通过，`cargo test` 22 项通过，`pnpm tauri build --debug --bundles app` 通过。
 - 性能目标目前完成实现侧优化；1000 张导入小于 30 秒、已缓存打开小于 200ms 仍需要在真实图片集和目标机器上做基准采样。
+- 已补充前端测试体系：新增 Vitest/jsdom、Testing Library、测试 setup、工具函数单测和应用空态/设置/高级搜索/浏览器预览交互测试。
+- 已补充 Rust Tauri command 测试：使用 Tauri mock runtime 覆盖 `get_app_status`、`list_collections`、`update_setting`、`get_settings` 命令链路；Rust 测试总数提升到 24 项。
+- 已补充跨平台 CI：`.github/workflows/ci.yml` 会在 macOS、Windows、Linux 执行依赖安装、前端测试、前端构建、Rust fmt、Rust 测试和 Tauri no-bundle 构建。
+- 已补充发布工作流：`.github/workflows/release.yml` 会在 tag 上构建 macOS app/dmg、Windows nsis/msi、Linux deb/appimage，并上传产物；签名和 updater 私钥使用 GitHub Secrets 预留。
+- 已补充打包配置：Tauri bundle 增加 publisher、分类、描述、Windows WebView2 安装模式、macOS hardened runtime/DMG 布局、Linux AppImage 配置和 favicon。
+- 已补充性能基准说明和本地 fixture 生成脚本：`docs/PERFORMANCE.md` 与 `pnpm bench:fixtures`，生成内容在已忽略的 `fixtures/` 下，不提交图片。
+- 已完成本轮验证：`pnpm test` 6 项通过，`pnpm build` 通过，`cargo fmt --check` 通过，`cargo test` 24 项通过，`pnpm tauri build --debug --bundles app` 通过；Playwright 桌面/移动空态冒烟无横向溢出，favicon 404 已修复。
 
 ## Blocked
 
 - 当前 macOS 机器仅安装 Xcode Command Line Tools，`tauri info` 提示完整 Xcode 未安装；后续 macOS 打包/签名前需要处理。
 - `pnpm tauri build --debug` 可生成 `.app`，但完整 DMG 打包在 `bundle_dmg.sh` 阶段失败；阶段 5 发布打包时需补充排查。
+- Windows、Linux 冒烟需要推送后由 GitHub Actions 或对应实体机器执行；本机无法直接执行跨平台安装包验证。
+- 代码签名、公证和自动更新签名需要证书、Apple 账号、Windows 证书以及 `TAURI_SIGNING_PRIVATE_KEY` 等 GitHub Secrets。

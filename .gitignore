@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Build outputs
 dist/
@@ -33,6 +34,7 @@ fixtures/
 # Test coverage
 coverage/
 .nyc_output/
+.playwright-mcp/
 
 # Editor directories and files
 .vscode/*

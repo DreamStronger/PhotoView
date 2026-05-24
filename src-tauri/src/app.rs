@@ -36,6 +36,17 @@ impl AppState {
         })
     }
 
+    #[cfg(test)]
+    pub fn initialize_for_test(app_data_dir: std::path::PathBuf) -> AppResult<Self> {
+        let paths = AppPaths::initialize_at(app_data_dir)?;
+        let db = db::open_database(&paths.database_path)?;
+
+        Ok(Self {
+            paths,
+            db: Mutex::new(db),
+        })
+    }
+
     pub fn status(&self) -> AppResult<AppStatus> {
         self.with_db(|db| {
             Ok(AppStatus {
