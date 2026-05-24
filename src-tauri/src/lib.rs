@@ -9,9 +9,9 @@ pub mod thumbs;
 
 use commands::data::{
     create_collection, create_image, create_tag, delete_collection_record, delete_image_record,
-    delete_tag, get_collection, get_image, get_setting, get_settings, get_tag, import_collection,
-    list_collections, list_images, list_tags, update_collection, update_image, update_setting,
-    update_tag,
+    delete_tag, get_collection, get_image, get_setting, get_settings, get_tag, get_thumbnail,
+    import_collection, list_collections, list_images, list_tags, update_collection, update_image,
+    update_setting, update_tag,
 };
 use commands::system::{
     choose_import_folder, copy_path_to_clipboard, copy_text_to_clipboard, get_app_status,
@@ -39,6 +39,8 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let state = app::AppState::initialize(app.handle())?;
+            app.asset_protocol_scope()
+                .allow_directory(&state.paths().thumbnails_dir, true)?;
             app.manage(state);
             Ok(())
         })
@@ -66,7 +68,8 @@ pub fn run() {
             delete_tag,
             get_settings,
             get_setting,
-            update_setting
+            update_setting,
+            get_thumbnail
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

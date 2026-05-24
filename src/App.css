@@ -399,6 +399,13 @@ nav {
   color: #526173;
 }
 
+.image-thumb-placeholder img {
+  width: 100%;
+  height: 100%;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
 .image-row-main {
   min-width: 0;
 }

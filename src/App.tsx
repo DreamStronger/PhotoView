@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
   ArrowLeft,
@@ -75,12 +75,23 @@ type ImageRecord = {
   isMissing: boolean;
 };
 
+type Thumbnail = {
+  imageId: string;
+  cachePath: string;
+  url: string;
+  width: number;
+  height: number;
+  status: string;
+};
+
 function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [images, setImages] = useState<ImageRecord[]>([]);
+  const [thumbnails, setThumbnails] = useState<Record<string, Thumbnail>>({});
+  const [thumbnailErrors, setThumbnailErrors] = useState<Record<string, string>>({});
   const [imagesLoading, setImagesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -90,6 +101,7 @@ function App() {
   const [sortKey, setSortKey] = useState<CollectionSortKey>("imported");
   const [viewMode, setViewMode] = useState<CollectionViewMode>("grid");
   const importInFlight = useRef(false);
+  const thumbnailRequests = useRef(new Set<string>());
   const imageListRef = useRef<HTMLDivElement | null>(null);
 
   const selectedCollection = useMemo(
@@ -129,7 +141,31 @@ function App() {
     }
 
     setImages([]);
+    setThumbnails({});
+    setThumbnailErrors({});
+    thumbnailRequests.current.clear();
   }, [selectedCollectionId]);
+
+  useEffect(() => {
+    if (!isTauriRuntime() || images.length === 0) {
+      return;
+    }
+
+    const visibleItems = imageVirtualizer.getVirtualItems();
+    for (const item of visibleItems) {
+      const image = images[item.index];
+      if (!image || thumbnails[image.id] || thumbnailErrors[image.id]) {
+        continue;
+      }
+
+      if (thumbnailRequests.current.has(image.id)) {
+        continue;
+      }
+
+      thumbnailRequests.current.add(image.id);
+      void loadThumbnail(image.id);
+    }
+  });
 
   useEffect(() => {
     if (!isTauriRuntime()) {
@@ -194,15 +230,33 @@ function App() {
     }
 
     try {
-      setImages(
-        await invoke<ImageRecord[]>("list_images", {
-          request: { collectionId, limit: 1000, offset: 0 },
-        }),
-      );
+      const nextImages = await invoke<ImageRecord[]>("list_images", {
+        request: { collectionId, limit: 1000, offset: 0 },
+      });
+      setImages(nextImages);
+      setThumbnails({});
+      setThumbnailErrors({});
+      thumbnailRequests.current.clear();
     } catch (value) {
       setError(invokeErrorMessage(value));
     } finally {
       setImagesLoading(false);
+    }
+  }
+
+  async function loadThumbnail(imageId: string) {
+    try {
+      const thumbnail = await invoke<Thumbnail>("get_thumbnail", {
+        imageId,
+        targetSize: 192,
+      });
+
+      setThumbnails((current) => ({ ...current, [imageId]: thumbnail }));
+    } catch (value) {
+      setThumbnailErrors((current) => ({
+        ...current,
+        [imageId]: invokeErrorMessage(value),
+      }));
     }
   }
 
@@ -391,7 +445,14 @@ function App() {
                           style={{ transform: `translateY(${virtualItem.start}px)` }}
                         >
                           <div className="image-thumb-placeholder">
-                            <FileImage size={20} aria-hidden="true" />
+                            {thumbnails[image.id] ? (
+                              <img
+                                alt=""
+                                src={convertFileSrc(thumbnails[image.id].cachePath)}
+                              />
+                            ) : (
+                              <FileImage size={20} aria-hidden="true" />
+                            )}
                           </div>
                           <div className="image-row-main">
                             <h2>{image.fileName}</h2>

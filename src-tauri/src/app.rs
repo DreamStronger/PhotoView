@@ -68,4 +68,8 @@ impl AppState {
 
         f(&mut db)
     }
+
+    pub fn paths(&self) -> &AppPaths {
+        &self.paths
+    }
 }

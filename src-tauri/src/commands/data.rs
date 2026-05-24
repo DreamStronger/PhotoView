@@ -1,12 +1,14 @@
 use crate::{
     app::AppState,
     db::repositories,
-    errors::AppResult,
+    errors::{AppError, AppResult},
     models::{
         CollectionDto, CreateCollectionRequest, CreateImageRequest, CreateTagRequest, ImageDto,
         ImportCollectionRequest, ImportCollectionResult, ListImagesRequest, SettingDto, TagDto,
-        UpdateCollectionRequest, UpdateImageRequest, UpdateSettingRequest, UpdateTagRequest,
+        ThumbnailDto, UpdateCollectionRequest, UpdateImageRequest, UpdateSettingRequest,
+        UpdateTagRequest,
     },
+    thumbs::{get_or_create_thumbnail, read_source_metadata, ThumbnailRequest},
 };
 use tauri::State;
 
@@ -124,4 +126,40 @@ pub fn update_setting(
     request: UpdateSettingRequest,
 ) -> AppResult<SettingDto> {
     state.with_db(|db| repositories::update_setting(db, request))
+}
+
+#[tauri::command]
+pub fn get_thumbnail(
+    state: State<'_, AppState>,
+    image_id: String,
+    target_size: Option<u32>,
+) -> AppResult<ThumbnailDto> {
+    let image = state
+        .with_db(|db| repositories::get_image(db, &image_id))?
+        .ok_or_else(|| AppError::new("not_found", "图片不存在"))?;
+
+    let source = read_source_metadata(&image.path)
+        .map_err(|value| AppError::new("thumbnail_error", value.to_string()))?;
+    let request = ThumbnailRequest::new(
+        &image.path,
+        &state.paths().thumbnails_dir,
+        &image.id,
+        source.source_size_bytes,
+        source.source_mtime,
+        target_size.unwrap_or(192),
+    );
+    let thumbnail = get_or_create_thumbnail(&request)
+        .map_err(|value| AppError::new("thumbnail_error", value.to_string()))?;
+
+    Ok(ThumbnailDto {
+        image_id: image.id,
+        cache_path: thumbnail.cache_path.display().to_string(),
+        url: thumbnail.cache_path.display().to_string(),
+        width: thumbnail.width,
+        height: thumbnail.height,
+        status: match thumbnail.status {
+            crate::thumbs::ThumbnailCacheStatus::Hit => "hit".to_string(),
+            crate::thumbs::ThumbnailCacheStatus::Miss => "miss".to_string(),
+        },
+    })
 }

@@ -167,3 +167,14 @@ pub struct UpdateSettingRequest {
     pub key: String,
     pub value: String,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThumbnailDto {
+    pub image_id: String,
+    pub cache_path: String,
+    pub url: String,
+    pub width: u32,
+    pub height: u32,
+    pub status: String,
+}
