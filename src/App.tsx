@@ -2,14 +2,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
+  ArrowLeft,
   Copy,
   ExternalLink,
+  FileImage,
   FolderPlus,
   Grid2X2,
   Images,
   List,
   Star,
 } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import "./App.css";
 
 type AppStatus = {
@@ -29,6 +32,7 @@ type AppStatus = {
 
 type ImportCollectionResult = {
   collection: {
+    id: string;
     name: string;
   };
   scannedCount: number;
@@ -55,10 +59,29 @@ type Collection = {
 type CollectionSortKey = "imported" | "name" | "images" | "size";
 type CollectionViewMode = "grid" | "list";
 
+type ImageRecord = {
+  id: string;
+  collectionId: string;
+  path: string;
+  fileName: string;
+  extension: string;
+  format: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  importedAt: string;
+  rating: number;
+  isFavorite: boolean;
+  isMissing: boolean;
+};
+
 function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [images, setImages] = useState<ImageRecord[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedImportPath, setSelectedImportPath] = useState<string | null>(null);
@@ -67,6 +90,12 @@ function App() {
   const [sortKey, setSortKey] = useState<CollectionSortKey>("imported");
   const [viewMode, setViewMode] = useState<CollectionViewMode>("grid");
   const importInFlight = useRef(false);
+  const imageListRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedCollection = useMemo(
+    () => collections.find((collection) => collection.id === selectedCollectionId) ?? null,
+    [collections, selectedCollectionId],
+  );
 
   const visibleCollections = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -82,9 +111,25 @@ function App() {
     return [...filtered].sort((left, right) => compareCollections(left, right, sortKey));
   }, [collections, query, sortKey]);
 
+  const imageVirtualizer = useVirtualizer({
+    count: images.length,
+    getScrollElement: () => imageListRef.current,
+    estimateSize: () => 78,
+    overscan: 8,
+  });
+
   useEffect(() => {
     void refreshAppData();
   }, []);
+
+  useEffect(() => {
+    if (selectedCollectionId) {
+      void refreshImages(selectedCollectionId);
+      return;
+    }
+
+    setImages([]);
+  }, [selectedCollectionId]);
 
   useEffect(() => {
     if (!isTauriRuntime()) {
@@ -139,6 +184,28 @@ function App() {
     }
   }
 
+  async function refreshImages(collectionId: string) {
+    setImagesLoading(true);
+
+    if (!isTauriRuntime()) {
+      setImages([]);
+      setImagesLoading(false);
+      return;
+    }
+
+    try {
+      setImages(
+        await invoke<ImageRecord[]>("list_images", {
+          request: { collectionId, limit: 1000, offset: 0 },
+        }),
+      );
+    } catch (value) {
+      setError(invokeErrorMessage(value));
+    } finally {
+      setImagesLoading(false);
+    }
+  }
+
   async function handleChooseImportFolder() {
     if (importInFlight.current) {
       return;
@@ -174,6 +241,7 @@ function App() {
         `${result.collection.name}：扫描 ${result.scannedCount} 张，新增 ${result.insertedCount} 张，更新 ${result.updatedCount} 张，错误 ${result.errorCount} 个`,
       );
       await refreshAppData();
+      setSelectedCollectionId(result.collection.id);
     } catch (value) {
       setError(invokeErrorMessage(value));
     } finally {
@@ -231,6 +299,12 @@ function App() {
     }
   }
 
+  function openCollection(collection: Collection) {
+    setSelectedCollectionId(collection.id);
+    setNotice(null);
+    setError(null);
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="PhotoView navigation">
@@ -267,106 +341,204 @@ function App() {
         </header>
 
         <section className="content">
-          <div className="section-heading">
-            <h1>全部合集</h1>
-            <span>
-              {status
-                ? `${visibleCollections.length}/${status.collection_count} 个合集`
-                : "初始化中"}
-            </span>
-          </div>
-
-          <div className="collection-controls">
-            <select
-              aria-label="合集排序"
-              value={sortKey}
-              onChange={(event) => setSortKey(event.target.value as CollectionSortKey)}
-            >
-              <option value="imported">最近导入</option>
-              <option value="name">名称</option>
-              <option value="images">图片数量</option>
-              <option value="size">占用空间</option>
-            </select>
-            <div className="segmented-control" aria-label="合集视图">
-              <button
-                aria-label="网格视图"
-                className={viewMode === "grid" ? "active" : ""}
-                title="网格视图"
-                type="button"
-                onClick={() => setViewMode("grid")}
-              >
-                <Grid2X2 size={16} aria-hidden="true" />
-              </button>
-              <button
-                aria-label="列表视图"
-                className={viewMode === "list" ? "active" : ""}
-                title="列表视图"
-                type="button"
-                onClick={() => setViewMode("list")}
-              >
-                <List size={16} aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-
-          <section className={`collection-surface ${viewMode}`} aria-busy={collectionsLoading}>
-            {collectionsLoading ? (
-              <div className="empty-state">
-                <h2>加载中</h2>
-                <p>正在读取本地合集索引。</p>
+          {selectedCollection ? (
+            <>
+              <div className="section-heading detail-heading">
+                <button
+                  aria-label="返回合集"
+                  className="icon-button"
+                  title="返回合集"
+                  type="button"
+                  onClick={() => setSelectedCollectionId(null)}
+                >
+                  <ArrowLeft size={16} aria-hidden="true" />
+                </button>
+                <h1>{selectedCollection.name}</h1>
+                <span>{images.length} 张图片</span>
               </div>
-            ) : visibleCollections.length > 0 ? (
-              visibleCollections.map((collection) => (
-                <article className="collection-card" key={collection.id}>
-                  <div className="collection-cover">
-                    <Images size={24} aria-hidden="true" />
-                  </div>
-                  <div className="collection-main">
-                    <div className="collection-title-row">
-                      <h2>{collection.name}</h2>
-                      {collection.isFavorite ? <Star size={15} aria-label="已收藏" /> : null}
-                    </div>
-                    <p>{collection.path}</p>
-                    <div className="collection-meta">
-                      <span>{collection.imageCount} 张</span>
-                      <span>{formatBytes(collection.totalSizeBytes)}</span>
-                      <span>{formatDate(collection.importedAt)}</span>
-                      <span>评分 {collection.rating}/5</span>
-                    </div>
-                  </div>
-                  <div className="collection-actions">
-                    <button
-                      aria-label="复制路径"
-                      className="icon-button"
-                      title="复制路径"
-                      type="button"
-                      onClick={() => void copyPath(collection.path)}
-                    >
-                      <Copy size={16} aria-hidden="true" />
-                    </button>
-                    <button
-                      aria-label="打开所在位置"
-                      className="icon-button"
-                      title="打开所在位置"
-                      type="button"
-                      onClick={() => void openPath(collection.path)}
-                    >
-                      <ExternalLink size={16} aria-hidden="true" />
-                    </button>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <div className="empty-state">
-                <h2>{collections.length > 0 ? "没有匹配合集" : "暂无合集"}</h2>
-                <p>
-                  {collections.length > 0
-                    ? "调整搜索关键词后再试。"
-                    : "选择本地图片文件夹后，PhotoView 会在本机建立索引。"}
-                </p>
+
+              <div className="detail-meta">
+                <span>{selectedCollection.path}</span>
+                <button
+                  aria-label="打开所在位置"
+                  className="icon-button"
+                  title="打开所在位置"
+                  type="button"
+                  onClick={() => void openPath(selectedCollection.path)}
+                >
+                  <ExternalLink size={16} aria-hidden="true" />
+                </button>
               </div>
-            )}
-          </section>
+
+              <section className="image-surface" ref={imageListRef} aria-busy={imagesLoading}>
+                {imagesLoading ? (
+                  <div className="empty-state">
+                    <h2>加载中</h2>
+                    <p>正在读取图片索引。</p>
+                  </div>
+                ) : images.length > 0 ? (
+                  <div
+                    className="image-virtual-space"
+                    style={{ height: `${imageVirtualizer.getTotalSize()}px` }}
+                  >
+                    {imageVirtualizer.getVirtualItems().map((virtualItem) => {
+                      const image = images[virtualItem.index];
+
+                      return (
+                        <article
+                          className="image-row"
+                          key={image.id}
+                          style={{ transform: `translateY(${virtualItem.start}px)` }}
+                        >
+                          <div className="image-thumb-placeholder">
+                            <FileImage size={20} aria-hidden="true" />
+                          </div>
+                          <div className="image-row-main">
+                            <h2>{image.fileName}</h2>
+                            <p>{image.path}</p>
+                          </div>
+                          <div className="image-row-meta">
+                            <span>{image.format}</span>
+                            <span>
+                              {image.width && image.height
+                                ? `${image.width} x ${image.height}`
+                                : "尺寸未知"}
+                            </span>
+                            <span>{formatBytes(image.sizeBytes)}</span>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <h2>暂无图片</h2>
+                    <p>重新导入或检查文件夹权限后再试。</p>
+                  </div>
+                )}
+              </section>
+            </>
+          ) : (
+            <>
+              <div className="section-heading">
+                <h1>全部合集</h1>
+                <span>
+                  {status
+                    ? `${visibleCollections.length}/${status.collection_count} 个合集`
+                    : "初始化中"}
+                </span>
+              </div>
+
+              <div className="collection-controls">
+                <select
+                  aria-label="合集排序"
+                  value={sortKey}
+                  onChange={(event) => setSortKey(event.target.value as CollectionSortKey)}
+                >
+                  <option value="imported">最近导入</option>
+                  <option value="name">名称</option>
+                  <option value="images">图片数量</option>
+                  <option value="size">占用空间</option>
+                </select>
+                <div className="segmented-control" aria-label="合集视图">
+                  <button
+                    aria-label="网格视图"
+                    className={viewMode === "grid" ? "active" : ""}
+                    title="网格视图"
+                    type="button"
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <Grid2X2 size={16} aria-hidden="true" />
+                  </button>
+                  <button
+                    aria-label="列表视图"
+                    className={viewMode === "list" ? "active" : ""}
+                    title="列表视图"
+                    type="button"
+                    onClick={() => setViewMode("list")}
+                  >
+                    <List size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <section className={`collection-surface ${viewMode}`} aria-busy={collectionsLoading}>
+                {collectionsLoading ? (
+                  <div className="empty-state">
+                    <h2>加载中</h2>
+                    <p>正在读取本地合集索引。</p>
+                  </div>
+                ) : visibleCollections.length > 0 ? (
+                  visibleCollections.map((collection) => (
+                    <article
+                      className="collection-card"
+                      key={collection.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openCollection(collection)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          openCollection(collection);
+                        }
+                      }}
+                    >
+                      <div className="collection-cover">
+                        <Images size={24} aria-hidden="true" />
+                      </div>
+                      <div className="collection-main">
+                        <div className="collection-title-row">
+                          <h2>{collection.name}</h2>
+                          {collection.isFavorite ? <Star size={15} aria-label="已收藏" /> : null}
+                        </div>
+                        <p>{collection.path}</p>
+                        <div className="collection-meta">
+                          <span>{collection.imageCount} 张</span>
+                          <span>{formatBytes(collection.totalSizeBytes)}</span>
+                          <span>{formatDate(collection.importedAt)}</span>
+                          <span>评分 {collection.rating}/5</span>
+                        </div>
+                      </div>
+                      <div className="collection-actions">
+                        <button
+                          aria-label="复制路径"
+                          className="icon-button"
+                          title="复制路径"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void copyPath(collection.path);
+                          }}
+                        >
+                          <Copy size={16} aria-hidden="true" />
+                        </button>
+                        <button
+                          aria-label="打开所在位置"
+                          className="icon-button"
+                          title="打开所在位置"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void openPath(collection.path);
+                          }}
+                        >
+                          <ExternalLink size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div className="empty-state">
+                    <h2>{collections.length > 0 ? "没有匹配合集" : "暂无合集"}</h2>
+                    <p>
+                      {collections.length > 0
+                        ? "调整搜索关键词后再试。"
+                        : "选择本地图片文件夹后，PhotoView 会在本机建立索引。"}
+                    </p>
+                  </div>
+                )}
+              </section>
+            </>
+          )}
 
           {selectedImportPath ? (
             <div className="selected-folder" aria-label="已选择的导入文件夹">

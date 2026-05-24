@@ -230,6 +230,16 @@ nav {
   min-width: 0;
 }
 
+.collection-card[role="button"] {
+  cursor: pointer;
+}
+
+.collection-card[role="button"]:hover,
+.collection-card[role="button"]:focus-visible {
+  border-color: #9fb2c8;
+  outline: 0;
+}
+
 .collection-surface.grid .collection-card {
   grid-template-columns: 1fr auto;
   grid-template-rows: 64px minmax(0, 1fr);
@@ -320,6 +330,104 @@ nav {
 
 .collection-surface .empty-state {
   grid-column: 1 / -1;
+}
+
+.detail-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.detail-heading h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px 12px;
+}
+
+.detail-meta span {
+  overflow: hidden;
+  color: #526173;
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-surface {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.image-virtual-space {
+  position: relative;
+  min-height: 100%;
+}
+
+.image-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  height: 78px;
+  border-bottom: 1px solid #eef2f6;
+  padding: 10px 12px;
+}
+
+.image-thumb-placeholder {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 7px;
+  background: #f0f4f8;
+  color: #526173;
+}
+
+.image-row-main {
+  min-width: 0;
+}
+
+.image-row-main h2 {
+  overflow: hidden;
+  margin: 0;
+  color: #1f2933;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-row-main p {
+  overflow: hidden;
+  margin: 4px 0 0;
+  color: #637083;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 10px;
+  color: #536173;
+  font-size: 0.78rem;
 }
 
 .selected-folder {
@@ -420,6 +528,21 @@ nav {
 
   .collection-actions,
   .collection-surface.grid .collection-actions {
+    justify-content: flex-start;
+  }
+
+  .image-row {
+    grid-template-columns: 44px minmax(0, 1fr);
+    height: 96px;
+  }
+
+  .image-thumb-placeholder {
+    width: 44px;
+    height: 44px;
+  }
+
+  .image-row-meta {
+    grid-column: 2;
     justify-content: flex-start;
   }
 }
