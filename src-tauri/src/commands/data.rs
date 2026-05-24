@@ -7,12 +7,13 @@ use crate::{
         CreateTagRequest, ImageDto, ImportCollectionRequest, ImportCollectionResult,
         ListImagesRequest, SettingDto, TagDto, TaskDto, ThumbnailCacheStatsDto, ThumbnailDto,
         ThumbnailTaskRequest, UpdateCollectionRequest, UpdateImageRequest, UpdateSettingRequest,
-        UpdateTagRequest,
+        UpdateTagRequest, ViewerImageDto,
     },
     thumbs::{
         clear_thumbnail_cache as clear_thumbnail_cache_files, collect_thumbnail_cache_stats,
         get_or_create_thumbnail, read_source_metadata, ThumbnailCacheStatus, ThumbnailRequest,
     },
+    viewer::{get_or_create_viewer_image, ViewerImageRequest},
 };
 use std::path::Path;
 use tauri::{AppHandle, Manager, State};
@@ -151,6 +152,17 @@ pub fn get_thumbnail(
         .with_db(|db| repositories::get_image(db, &image_id))?
         .ok_or_else(|| AppError::new("not_found", "图片不存在"))?;
 
+    if uses_source_thumbnail(&image.path) {
+        return Ok(ThumbnailDto {
+            image_id: image.id,
+            cache_path: image.path.clone(),
+            url: image.path,
+            width: optional_dimension_to_u32(image.width),
+            height: optional_dimension_to_u32(image.height),
+            status: "source".to_string(),
+        });
+    }
+
     let source = read_source_metadata(&image.path)
         .map_err(|value| AppError::new("thumbnail_error", value.to_string()))?;
     let request = ThumbnailRequest::new(
@@ -256,4 +268,56 @@ pub fn clear_thumbnail_cache(state: State<'_, AppState>) -> AppResult<ClearThumb
         deleted_dir_count: result.deleted_dir_count,
         freed_bytes: result.freed_bytes,
     })
+}
+
+#[tauri::command]
+pub fn get_viewer_image(
+    state: State<'_, AppState>,
+    image_id: String,
+    max_side: Option<u32>,
+) -> AppResult<ViewerImageDto> {
+    let image = state
+        .with_db(|db| repositories::get_image(db, &image_id))?
+        .ok_or_else(|| AppError::new("not_found", "图片不存在"))?;
+
+    let source = read_source_metadata(&image.path)
+        .map_err(|value| AppError::new("viewer_error", value.to_string()))?;
+    let request = ViewerImageRequest::new(
+        &image.path,
+        &state.paths().thumbnails_dir,
+        &image.id,
+        source.source_size_bytes,
+        source.source_mtime,
+        max_side.unwrap_or(4096),
+    );
+    let asset = get_or_create_viewer_image(&request)?;
+    let asset_path = asset.asset_path.display().to_string();
+
+    Ok(ViewerImageDto {
+        image_id: image.id,
+        asset_path: asset_path.clone(),
+        url: asset_path,
+        width: asset.width,
+        height: asset.height,
+        format: asset.format,
+        kind: asset.kind.as_str().to_string(),
+        status: asset.status.as_str().to_string(),
+    })
+}
+
+fn uses_source_thumbnail(path: &str) -> bool {
+    matches!(
+        Path::new(path)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.to_ascii_lowercase())
+            .as_deref(),
+        Some("avif" | "svg")
+    )
+}
+
+fn optional_dimension_to_u32(value: Option<i64>) -> u32 {
+    value
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or(0)
 }

@@ -7,13 +7,14 @@ mod paths;
 pub mod scanner;
 mod tasks;
 pub mod thumbs;
+mod viewer;
 
 use commands::data::{
     clear_thumbnail_cache, create_collection, create_image, create_tag, delete_collection_record,
     delete_image_record, delete_tag, enqueue_thumbnail_generation, get_collection, get_image,
     get_setting, get_settings, get_tag, get_task, get_thumbnail, get_thumbnail_cache_stats,
-    import_collection, list_collections, list_images, list_tags, update_collection, update_image,
-    update_setting, update_tag,
+    get_viewer_image, import_collection, list_collections, list_images, list_tags,
+    update_collection, update_image, update_setting, update_tag,
 };
 use commands::system::{
     choose_import_folder, copy_path_to_clipboard, copy_text_to_clipboard, get_app_status,
@@ -83,7 +84,8 @@ pub fn run() {
             enqueue_thumbnail_generation,
             get_task,
             get_thumbnail_cache_stats,
-            clear_thumbnail_cache
+            clear_thumbnail_cache,
+            get_viewer_image
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

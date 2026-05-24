@@ -218,3 +218,16 @@ pub struct ClearThumbnailCacheResult {
     pub deleted_dir_count: u64,
     pub freed_bytes: u64,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewerImageDto {
+    pub image_id: String,
+    pub asset_path: String,
+    pub url: String,
+    pub width: u32,
+    pub height: u32,
+    pub format: String,
+    pub kind: String,
+    pub status: String,
+}

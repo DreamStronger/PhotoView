@@ -94,6 +94,17 @@ type Thumbnail = {
   status: string;
 };
 
+type ViewerImageAsset = {
+  imageId: string;
+  assetPath: string;
+  url: string;
+  width: number;
+  height: number;
+  format: string;
+  kind: string;
+  status: string;
+};
+
 type ViewerFitMode = "fit" | "actual";
 type ImageLoadState = "loading" | "loaded" | "error";
 
@@ -114,6 +125,7 @@ function App() {
   const [sortKey, setSortKey] = useState<CollectionSortKey>("imported");
   const [viewMode, setViewMode] = useState<CollectionViewMode>("grid");
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [viewerAsset, setViewerAsset] = useState<ViewerImageAsset | null>(null);
   const [viewerFitMode, setViewerFitMode] = useState<ViewerFitMode>("fit");
   const [viewerZoom, setViewerZoom] = useState(1);
   const [viewerRotation, setViewerRotation] = useState(0);
@@ -122,6 +134,7 @@ function App() {
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(true);
   const importInFlight = useRef(false);
   const thumbnailRequests = useRef(new Set<string>());
+  const viewerAssetRequest = useRef(0);
   const imageListRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<HTMLDivElement | null>(null);
 
@@ -131,6 +144,10 @@ function App() {
   );
 
   const activeImage = viewerIndex === null ? null : images[viewerIndex] ?? null;
+  const viewerImageSrc =
+    activeImage && (!isTauriRuntime() || viewerAsset)
+      ? convertImagePath(viewerAsset?.assetPath ?? activeImage.path)
+      : null;
 
   const visibleCollections = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -212,10 +229,18 @@ function App() {
 
   useEffect(() => {
     if (!activeImage) {
+      setViewerAsset(null);
       return;
     }
 
+    const requestId = viewerAssetRequest.current + 1;
+    viewerAssetRequest.current = requestId;
+    setViewerAsset(null);
     setViewerImageState("loading");
+
+    if (isTauriRuntime()) {
+      void loadViewerImage(activeImage.id, requestId);
+    }
   }, [activeImage?.id]);
 
   useEffect(() => {
@@ -333,6 +358,24 @@ function App() {
     }
   }
 
+  async function loadViewerImage(imageId: string, requestId: number) {
+    try {
+      const asset = await invoke<ViewerImageAsset>("get_viewer_image", {
+        imageId,
+        maxSide: 4096,
+      });
+
+      if (viewerAssetRequest.current === requestId) {
+        setViewerAsset(asset);
+      }
+    } catch (value) {
+      if (viewerAssetRequest.current === requestId) {
+        setViewerImageState("error");
+        setError(invokeErrorMessage(value));
+      }
+    }
+  }
+
   async function handleChooseImportFolder() {
     if (importInFlight.current) {
       return;
@@ -447,7 +490,9 @@ function App() {
   }
 
   function closeViewer() {
+    viewerAssetRequest.current += 1;
     setViewerIndex(null);
+    setViewerAsset(null);
     setIsSlideshowActive(false);
   }
 
@@ -877,17 +922,21 @@ function App() {
               {viewerImageState === "error" ? (
                 <div className="viewer-placeholder error">图片解码失败</div>
               ) : null}
-              <img
-                alt={activeImage.fileName}
-                className={viewerFitMode === "fit" ? "fit" : "actual"}
-                src={convertImagePath(activeImage.path)}
-                style={{
-                  opacity: viewerImageState === "loaded" ? 1 : 0,
-                  transform: `rotate(${viewerRotation}deg) scale(${viewerFitMode === "fit" ? 1 : viewerZoom})`,
-                }}
-                onError={() => setViewerImageState("error")}
-                onLoad={() => setViewerImageState("loaded")}
-              />
+              {viewerImageSrc ? (
+                <img
+                  alt={activeImage.fileName}
+                  className={viewerFitMode === "fit" ? "fit" : "actual"}
+                  src={viewerImageSrc}
+                  style={{
+                    opacity: viewerImageState === "loaded" ? 1 : 0,
+                    transform: `rotate(${viewerRotation}deg) scale(${
+                      viewerFitMode === "fit" ? 1 : viewerZoom
+                    })`,
+                  }}
+                  onError={() => setViewerImageState("error")}
+                  onLoad={() => setViewerImageState("loaded")}
+                />
+              ) : null}
             </div>
 
             {isInfoPanelOpen ? (
@@ -901,8 +950,11 @@ function App() {
                   <div>
                     <dt>尺寸</dt>
                     <dd>
-                      {activeImage.width && activeImage.height
-                        ? `${activeImage.width} x ${activeImage.height}`
+                      {(viewerAsset?.width || activeImage.width) &&
+                      (viewerAsset?.height || activeImage.height)
+                        ? `${viewerAsset?.width || activeImage.width} x ${
+                            viewerAsset?.height || activeImage.height
+                          }`
                         : "未知"}
                     </dd>
                   </div>

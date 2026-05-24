@@ -93,6 +93,10 @@ fn generate_thumbnail_for_image(
     image: &ImageDto,
     target_size: u32,
 ) -> AppResult<()> {
+    if uses_source_thumbnail(&image.path) {
+        return Ok(());
+    }
+
     let source = read_source_metadata(&image.path)
         .map_err(|value| AppError::new("thumbnail_error", value.to_string()))?;
     let request = ThumbnailRequest::new(
@@ -123,5 +127,16 @@ fn generate_thumbnail_for_image(
                 ThumbnailCacheStatus::Miss => "miss",
             },
         },
+    )
+}
+
+fn uses_source_thumbnail(path: &str) -> bool {
+    matches!(
+        std::path::Path::new(path)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.to_ascii_lowercase())
+            .as_deref(),
+        Some("avif" | "svg")
     )
 }

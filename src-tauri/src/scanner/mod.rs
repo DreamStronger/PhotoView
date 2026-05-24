@@ -56,6 +56,10 @@ impl SupportedImageFormat {
     pub fn is_svg(self) -> bool {
         matches!(self, Self::Svg)
     }
+
+    pub fn skips_rust_dimension_decode(self) -> bool {
+        matches!(self, Self::Avif | Self::Svg)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -189,7 +193,7 @@ pub fn scan_file(path: impl AsRef<Path>) -> Result<Option<ScanCandidate>, ScanEr
         return Ok(None);
     }
 
-    let (width, height) = if format.is_svg() {
+    let (width, height) = if format.skips_rust_dimension_decode() {
         (None, None)
     } else {
         let (width, height) = read_raster_dimensions(path)?;
@@ -285,7 +289,7 @@ fn read_raster_dimensions(path: &Path) -> Result<(u32, u32), ScanError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::{Rgb, RgbImage};
+    use image::{ImageFormat, Rgb, RgbImage};
     use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -385,6 +389,21 @@ mod tests {
     }
 
     #[test]
+    fn scan_file_recognizes_avif_without_decoding_dimensions() {
+        let directory = TestDirectory::new("avif_file");
+        let avif_path = directory.join("square.avif");
+        write_image(&avif_path, ImageFormat::Avif, 16, 16);
+
+        let candidate = scan_file(&avif_path)
+            .expect("avif should scan")
+            .expect("supported avif should produce a candidate");
+
+        assert_eq!(candidate.format, SupportedImageFormat::Avif);
+        assert_eq!(candidate.width, None);
+        assert_eq!(candidate.height, None);
+    }
+
+    #[test]
     fn scan_directory_collects_candidates_and_decode_errors() {
         let directory = TestDirectory::new("directory");
         let nested = directory.join("nested");
@@ -431,7 +450,13 @@ mod tests {
     }
 
     fn write_png(path: &Path, width: u32, height: u32) {
+        write_image(path, ImageFormat::Png, width, height);
+    }
+
+    fn write_image(path: &Path, format: ImageFormat, width: u32, height: u32) {
         let image = RgbImage::from_pixel(width, height, Rgb([12, 34, 56]));
-        image.save(path).expect("png fixture should be saved");
+        image
+            .save_with_format(path, format)
+            .expect("image fixture should be saved");
     }
 }

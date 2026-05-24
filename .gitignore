@@ -28,6 +28,7 @@ lerna-debug.log*
 *.db-shm
 *.db-wal
 thumbnails/
+fixtures/
 
 # Test coverage
 coverage/

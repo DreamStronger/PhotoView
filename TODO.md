@@ -24,8 +24,8 @@
 
 ## 阶段 2：核心浏览体验
 
-- [ ] 图片解码 subagent：支持 jpg/jpeg、png、gif、bmp、ico、tiff。
-- [ ] 图片解码 subagent：支持 webp、avif、svg。
+- [x] 图片解码 subagent：支持 jpg/jpeg、png、gif、bmp、ico、tiff。
+- [x] 图片解码 subagent：支持 webp、avif、svg。
 - [x] 图片解码 subagent：处理大图加载、解码失败和占位图状态。
 - [x] 缩略图 subagent：实现缩略图生成任务队列。
 - [x] 缩略图 subagent：实现磁盘缓存、缓存命中和失败重试。

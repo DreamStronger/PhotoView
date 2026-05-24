@@ -3,8 +3,8 @@
 ## Current
 
 - 阶段：阶段 2，核心浏览体验。
-- 正在做：阶段 2 核心浏览体验主体已完成，剩余图片格式兼容测试集逐项验收。
-- 下一步：补齐 jpg/png/gif/bmp/ico/tiff/webp/avif/svg 真实文件打开验收，并开始阶段 3 管理能力。
+- 正在做：阶段 2 核心浏览体验已完成，准备进入阶段 3 管理能力。
+- 下一步：实现合集编辑、收藏/最近查看、删除记录，以及图片单图管理入口。
 
 ## Done
 
@@ -40,6 +40,9 @@
 - 已实现图片查看器 overlay：双击/Enter 打开，支持上一张/下一张、左右键、Esc 关闭、适应窗口、实际大小、缩放、旋转、全屏、2s 幻灯片和信息面板。
 - 已实现查看器图片加载状态和解码失败占位。
 - 已完成本轮验证：`pnpm build` 通过，`cargo fmt --check` 通过，`cargo test` 17 项通过，`pnpm tauri build --debug --bundles app` 通过，Playwright 桌面/移动空态冒烟无横向溢出。
+- 已实现查看器后端预览 asset：jpg/png/bmp/ico/tiff/webp 由 Rust 解码成 PNG 预览缓存，avif/gif/svg 通过已授权源文件直显；前端查看器会先请求 `get_viewer_image` 再显示。
+- 已调整 AVIF 扫描策略：AVIF 可入库但不强制 Rust 提取尺寸，避免默认构建引入系统 dav1d/pkg-config 依赖。
+- 已完成格式兼容单元测试：`cargo test` 20 项通过，覆盖 AVIF/SVG 入库策略、常见栅格格式查看器预览和 AVIF/GIF/SVG 源文件查看策略。
 
 ## Blocked
 
