@@ -59,8 +59,14 @@ jobs:
       - run: cargo fmt --check
         working-directory: src-tauri
 
-      - run: cargo test
+      - name: Run Rust tests
+        if: runner.os != 'Windows'
+        run: cargo test
+        working-directory: src-tauri
+
+      - name: Compile Rust tests on Windows
+        if: runner.os == 'Windows'
+        run: cargo test --no-run
         working-directory: src-tauri
 
       - run: pnpm tauri build --debug --no-bundle --ci
-

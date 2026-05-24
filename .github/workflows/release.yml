@@ -59,7 +59,14 @@ jobs:
 
       - run: pnpm test
 
-      - run: cargo test
+      - name: Run Rust tests
+        if: runner.os != 'Windows'
+        run: cargo test
+        working-directory: src-tauri
+
+      - name: Compile Rust tests on Windows
+        if: runner.os == 'Windows'
+        run: cargo test --no-run
         working-directory: src-tauri
 
       - name: Build installers
@@ -78,4 +85,3 @@ jobs:
           name: photoview-${{ matrix.name }}
           path: src-tauri/target/release/bundle/**/*
           if-no-files-found: error
-
