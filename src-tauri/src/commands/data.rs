@@ -56,6 +56,19 @@ pub fn import_collection(
 }
 
 #[tauri::command]
+pub fn sync_collection(
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<ImportCollectionResult> {
+    state.with_db_mut(|db| repositories::sync_collection(db, &id))
+}
+
+#[tauri::command]
+pub fn sync_all_collections(state: State<'_, AppState>) -> AppResult<Vec<ImportCollectionResult>> {
+    state.with_db_mut(repositories::sync_all_collections)
+}
+
+#[tauri::command]
 pub fn update_collection(
     state: State<'_, AppState>,
     request: UpdateCollectionRequest,

@@ -3,8 +3,8 @@
 ## Current
 
 - 阶段：阶段 4，高级功能。
-- 正在做：搜索和重复检测已完成。
-- 下一步：实现文件监听和目录自动同步。
+- 正在做：搜索、重复检测、文件监听已完成。
+- 下一步：实现设置与数据工具，包括主题、语言、快捷键、缩略图大小、备份/恢复/重建索引/导出。
 
 ## Done
 
@@ -59,6 +59,9 @@
 - 已实现重复检测：后端会为图片计算 SHA256 和感知哈希，更新 `images.sha256`/`images.phash`，并返回完全重复组和视觉相似组。
 - 已实现重复处理界面：工具栏可运行重复检测，结果按组展示，可打开定位图片，并支持保留第一张、批量删除其余候选到回收站。
 - 已完成本轮验证：`pnpm build` 通过，`cargo fmt --check` 通过，`cargo test` 22 项通过，`pnpm tauri build --debug --bundles app` 通过，Playwright 桌面/移动重复检测入口无横向溢出。
+- 已实现文件同步：新增 `sync_collection`/`sync_all_collections`，同步时会扫描合集目录、入库新增图片、更新已有图片、将缺失路径标记为 missing 并刷新合集统计。
+- 已实现目录监听：应用启动后后台监听已导入合集目录，文件创建、修改、删除、重命名后自动同步并向前端发送 `library-synced` 事件；前端收到后刷新合集/图片列表。
+- 已完成本轮验证：`pnpm build` 通过，`cargo fmt` 后 `cargo test` 22 项通过，`pnpm tauri build --debug --bundles app` 通过，Playwright 桌面/移动同步入口无横向溢出。
 
 ## Blocked
 

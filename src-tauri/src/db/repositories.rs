@@ -13,7 +13,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension, Row};
-use std::{fs, path::Path, time::SystemTime};
+use std::{collections::HashSet, fs, path::Path, time::SystemTime};
 use uuid::Uuid;
 
 const DEFAULT_TAG_COLOR: &str = "#4f7cff";
@@ -117,6 +117,57 @@ pub fn import_collection(
         error_count: errors.len() as i64,
         errors,
     })
+}
+
+pub fn sync_collection(conn: &mut Connection, id: &str) -> AppResult<ImportCollectionResult> {
+    let current = get_collection_required(conn, id)?;
+    let root = Path::new(&current.path);
+    let report = scanner::scan_directory(root)
+        .map_err(|value| AppError::new("scan_error", value.to_string()))?;
+    let tx = conn.transaction()?;
+    let mut inserted_count = 0;
+    let mut updated_count = 0;
+    let mut scanned_paths = HashSet::new();
+
+    for candidate in &report.candidates {
+        scanned_paths.insert(path_to_string(&candidate.path));
+        match upsert_scanned_image(&tx, id, candidate)? {
+            UpsertOutcome::Inserted => inserted_count += 1,
+            UpsertOutcome::Updated => updated_count += 1,
+        }
+    }
+
+    mark_missing_images(&tx, id, &scanned_paths)?;
+    refresh_collection_stats(&tx, id)?;
+    let collection = get_collection_required(&tx, id)?;
+    tx.commit()?;
+
+    let errors = report
+        .errors
+        .into_iter()
+        .map(|error| ImportErrorDto {
+            path: path_to_string(&error.path),
+            kind: error.kind.to_string(),
+            message: error.message,
+        })
+        .collect::<Vec<_>>();
+
+    Ok(ImportCollectionResult {
+        collection,
+        scanned_count: report.candidates.len() as i64,
+        inserted_count,
+        updated_count,
+        error_count: errors.len() as i64,
+        errors,
+    })
+}
+
+pub fn sync_all_collections(conn: &mut Connection) -> AppResult<Vec<ImportCollectionResult>> {
+    let collections = list_collections(conn)?;
+    collections
+        .into_iter()
+        .map(|collection| sync_collection(conn, &collection.id))
+        .collect()
 }
 
 pub fn create_collection(
@@ -255,7 +306,7 @@ pub fn list_images(conn: &Connection, request: ListImagesRequest) -> AppResult<V
                    width, height, created_at, modified_at, imported_at, updated_at,
                    sha256, phash, rating, is_favorite, is_missing, last_viewed_at, view_count
             FROM images
-            WHERE collection_id = ?1
+            WHERE collection_id = ?1 AND is_missing = 0
             ORDER BY file_name COLLATE NOCASE ASC
             LIMIT ?2 OFFSET ?3
             ",
@@ -272,6 +323,7 @@ pub fn list_images(conn: &Connection, request: ListImagesRequest) -> AppResult<V
                width, height, created_at, modified_at, imported_at, updated_at,
                sha256, phash, rating, is_favorite, is_missing, last_viewed_at, view_count
         FROM images
+        WHERE is_missing = 0
         ORDER BY imported_at DESC, file_name COLLATE NOCASE ASC
         LIMIT ?1 OFFSET ?2
         ",
@@ -895,7 +947,7 @@ fn search_images(conn: &Connection, criteria: &SearchCriteria) -> AppResult<Vec<
                i.last_viewed_at, i.view_count
         FROM images i
         INNER JOIN collections c ON c.id = i.collection_id
-        WHERE c.deleted_at IS NULL
+        WHERE c.deleted_at IS NULL AND i.is_missing = 0
     "
     .to_string();
     let mut params = Vec::new();
@@ -1221,16 +1273,45 @@ fn refresh_collection_stats(conn: &Connection, collection_id: &str) -> AppResult
         "
         UPDATE collections
         SET image_count = (
-              SELECT COUNT(*) FROM images WHERE collection_id = ?1
+              SELECT COUNT(*) FROM images WHERE collection_id = ?1 AND is_missing = 0
             ),
             total_size_bytes = (
-              SELECT COALESCE(SUM(size_bytes), 0) FROM images WHERE collection_id = ?1
+              SELECT COALESCE(SUM(size_bytes), 0)
+              FROM images
+              WHERE collection_id = ?1 AND is_missing = 0
             ),
             updated_at = ?2
         WHERE id = ?1
         ",
         params![collection_id, now()],
     )?;
+
+    Ok(())
+}
+
+fn mark_missing_images(
+    conn: &Connection,
+    collection_id: &str,
+    scanned_paths: &HashSet<String>,
+) -> AppResult<()> {
+    let mut stmt = conn.prepare("SELECT id, path FROM images WHERE collection_id = ?1")?;
+    let rows = stmt.query_map(params![collection_id], |row| {
+        Ok((row.get::<_, String>("id")?, row.get::<_, String>("path")?))
+    })?;
+    let now = now();
+
+    for row in rows {
+        let (image_id, path) = row?;
+        let is_missing = !scanned_paths.contains(&path);
+        conn.execute(
+            "
+            UPDATE images
+            SET is_missing = ?2, updated_at = ?3
+            WHERE id = ?1
+            ",
+            params![image_id, bool_to_i64(is_missing), &now],
+        )?;
+    }
 
     Ok(())
 }

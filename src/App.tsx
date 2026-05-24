@@ -187,6 +187,7 @@ function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedImportPath, setSelectedImportPath] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -340,18 +341,30 @@ function App() {
       return;
     }
 
-    let unlisten: (() => void) | undefined;
+    let unlistenImport: (() => void) | undefined;
+    let unlistenSync: (() => void) | undefined;
 
     listen("menu-import-folder", () => {
       void handleChooseImportFolder();
     }).then((value) => {
-      unlisten = value;
+      unlistenImport = value;
+    });
+
+    listen<string>("library-synced", (event) => {
+      void refreshAppData();
+      if (selectedCollectionId === event.payload) {
+        void refreshImages(event.payload);
+      }
+      setNotice("文件夹变更已同步");
+    }).then((value) => {
+      unlistenSync = value;
     });
 
     return () => {
-      unlisten?.();
+      unlistenImport?.();
+      unlistenSync?.();
     };
-  }, []);
+  }, [selectedCollectionId]);
 
   useEffect(() => {
     if (!activeImage) {
@@ -636,6 +649,33 @@ function App() {
     } finally {
       importInFlight.current = false;
       setIsImporting(false);
+    }
+  }
+
+  async function syncLibrary() {
+    setError(null);
+    setNotice(null);
+    setIsSyncing(true);
+
+    if (!isTauriRuntime()) {
+      setNotice("请在桌面应用中同步文件夹");
+      setIsSyncing(false);
+      return;
+    }
+
+    try {
+      if (selectedCollectionId) {
+        await invoke("sync_collection", { id: selectedCollectionId });
+        await refreshImages(selectedCollectionId);
+      } else {
+        await invoke("sync_all_collections");
+      }
+      await refreshAppData();
+      setNotice("文件夹已同步");
+    } catch (value) {
+      setError(invokeErrorMessage(value));
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -1696,6 +1736,16 @@ function App() {
           >
             <Copy size={16} aria-hidden="true" />
             <span>{isDetectingDuplicates ? "检测中" : "重复"}</span>
+          </button>
+          <button
+            className="secondary-action"
+            type="button"
+            disabled={isSyncing}
+            aria-busy={isSyncing}
+            onClick={() => void syncLibrary()}
+          >
+            <RotateCw size={16} aria-hidden="true" />
+            <span>{isSyncing ? "同步中" : "同步"}</span>
           </button>
           <button
             className="primary-action"

@@ -9,6 +9,7 @@ pub mod scanner;
 mod tasks;
 pub mod thumbs;
 mod viewer;
+mod watcher;
 
 use commands::data::{
     clear_thumbnail_cache, copy_image_file, create_collection, create_image, create_tag,
@@ -17,8 +18,8 @@ use commands::data::{
     get_task, get_thumbnail, get_thumbnail_cache_stats, get_viewer_image, import_collection,
     list_collection_tag_assignments, list_collections, list_image_tag_assignments, list_images,
     list_tags, mark_collection_viewed, move_image_file, rename_image_file, run_duplicate_detection,
-    search_library, set_collection_tags, set_image_tags, update_collection, update_image,
-    update_setting, update_tag,
+    search_library, set_collection_tags, set_image_tags, sync_all_collections, sync_collection,
+    update_collection, update_image, update_setting, update_tag,
 };
 use commands::system::{
     choose_import_folder, copy_path_to_clipboard, copy_text_to_clipboard, get_app_status,
@@ -57,6 +58,7 @@ pub fn run() {
                 }
             }
             app.manage(state);
+            watcher::start_file_watcher(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -69,6 +71,8 @@ pub fn run() {
             get_collection,
             create_collection,
             import_collection,
+            sync_collection,
+            sync_all_collections,
             update_collection,
             mark_collection_viewed,
             delete_collection_record,
