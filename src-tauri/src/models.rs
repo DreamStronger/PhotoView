@@ -128,6 +128,34 @@ pub struct UpdateImageRequest {
     pub is_missing: Option<bool>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameImageFileRequest {
+    pub id: String,
+    pub file_name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveImageFileRequest {
+    pub id: String,
+    pub target_collection_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CopyImageFileRequest {
+    pub id: String,
+    pub target_collection_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteImageFileRequest {
+    pub id: String,
+    pub use_trash: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TagDto {

@@ -1,16 +1,17 @@
 use crate::{
     errors::{AppError, AppResult},
     models::{
-        CollectionDto, CreateCollectionRequest, CreateImageRequest, CreateTagRequest, ImageDto,
-        ImportCollectionRequest, ImportCollectionResult, ImportErrorDto, ListImagesRequest,
-        SettingDto, TagDto, TaskDto, UpdateCollectionRequest, UpdateImageRequest,
-        UpdateSettingRequest, UpdateTagRequest,
+        CollectionDto, CopyImageFileRequest, CreateCollectionRequest, CreateImageRequest,
+        CreateTagRequest, DeleteImageFileRequest, ImageDto, ImportCollectionRequest,
+        ImportCollectionResult, ImportErrorDto, ListImagesRequest, MoveImageFileRequest,
+        RenameImageFileRequest, SettingDto, TagDto, TaskDto, UpdateCollectionRequest,
+        UpdateImageRequest, UpdateSettingRequest, UpdateTagRequest,
     },
     scanner::{self, ScanCandidate},
 };
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
-use std::{path::Path, time::SystemTime};
+use std::{fs, path::Path, time::SystemTime};
 use uuid::Uuid;
 
 const DEFAULT_TAG_COLOR: &str = "#4f7cff";
@@ -400,6 +401,102 @@ pub fn delete_image_record(conn: &Connection, id: &str) -> AppResult<()> {
     let affected = conn.execute("DELETE FROM images WHERE id = ?1", params![id])?;
     ensure_affected(affected, "图片不存在")?;
     refresh_collection_stats(conn, &image.collection_id)
+}
+
+pub fn rename_image_file(
+    conn: &Connection,
+    request: RenameImageFileRequest,
+) -> AppResult<ImageDto> {
+    let image = get_image_required(conn, &request.id)?;
+    let new_file_name = validate_file_name(request.file_name)?;
+    let source_path = Path::new(&image.path);
+    let target_path = source_path
+        .parent()
+        .ok_or_else(|| AppError::new("validation_error", "图片路径缺少父目录"))?
+        .join(&new_file_name);
+    ensure_supported_image_path(&target_path)?;
+    ensure_destination_available(&target_path)?;
+
+    fs::rename(source_path, &target_path)?;
+    let update_result = update_image_file_location(
+        conn,
+        &image.id,
+        &image.collection_id,
+        &target_path,
+        Some(&new_file_name),
+    );
+
+    if let Err(error) = update_result {
+        let _ = fs::rename(&target_path, source_path);
+        return Err(error);
+    }
+
+    get_image_required(conn, &image.id)
+}
+
+pub fn move_image_file(conn: &Connection, request: MoveImageFileRequest) -> AppResult<ImageDto> {
+    let image = get_image_required(conn, &request.id)?;
+    let target_collection = get_collection_required(conn, &request.target_collection_id)?;
+    if target_collection.id == image.collection_id {
+        return Ok(image);
+    }
+
+    let source_path = Path::new(&image.path);
+    let target_path = Path::new(&target_collection.path).join(&image.file_name);
+    ensure_destination_available(&target_path)?;
+    fs::create_dir_all(
+        target_path
+            .parent()
+            .ok_or_else(|| AppError::new("validation_error", "目标路径缺少父目录"))?,
+    )?;
+
+    fs::rename(source_path, &target_path)?;
+    let update_result =
+        update_image_file_location(conn, &image.id, &target_collection.id, &target_path, None);
+
+    if let Err(error) = update_result {
+        let _ = fs::rename(&target_path, source_path);
+        return Err(error);
+    }
+
+    refresh_collection_stats(conn, &image.collection_id)?;
+    refresh_collection_stats(conn, &target_collection.id)?;
+    get_image_required(conn, &image.id)
+}
+
+pub fn copy_image_file(conn: &Connection, request: CopyImageFileRequest) -> AppResult<ImageDto> {
+    let image = get_image_required(conn, &request.id)?;
+    let target_collection = get_collection_required(conn, &request.target_collection_id)?;
+    let source_path = Path::new(&image.path);
+    let target_path = Path::new(&target_collection.path).join(&image.file_name);
+    ensure_destination_available(&target_path)?;
+    fs::create_dir_all(
+        target_path
+            .parent()
+            .ok_or_else(|| AppError::new("validation_error", "目标路径缺少父目录"))?,
+    )?;
+    fs::copy(source_path, &target_path)?;
+
+    match create_copied_image_record(conn, &image, &target_collection.id, &target_path) {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            let _ = fs::remove_file(&target_path);
+            Err(error)
+        }
+    }
+}
+
+pub fn delete_image_file(conn: &Connection, request: DeleteImageFileRequest) -> AppResult<()> {
+    let image = get_image_required(conn, &request.id)?;
+    let path = Path::new(&image.path);
+
+    if request.use_trash.unwrap_or(true) {
+        trash::delete(path).map_err(|error| AppError::new("io_error", error.to_string()))?;
+    } else {
+        fs::remove_file(path)?;
+    }
+
+    delete_image_record(conn, &image.id)
 }
 
 enum UpsertOutcome {
@@ -861,6 +958,89 @@ fn refresh_collection_stats(conn: &Connection, collection_id: &str) -> AppResult
     Ok(())
 }
 
+fn update_image_file_location(
+    conn: &Connection,
+    image_id: &str,
+    collection_id: &str,
+    target_path: &Path,
+    file_name: Option<&str>,
+) -> AppResult<()> {
+    let path = path_to_string(target_path);
+    let file_name = match file_name {
+        Some(value) => value.to_string(),
+        None => default_file_name(&path)?,
+    };
+    let extension = default_extension(&path)?;
+    let format = scanner::supported_image_format(target_path)
+        .ok_or_else(|| AppError::new("validation_error", "目标文件不是支持的图片格式"))?
+        .as_str()
+        .to_string();
+    let metadata = fs::metadata(target_path)?;
+    let size_bytes = i64::try_from(metadata.len())
+        .map_err(|_| AppError::new("validation_error", "文件大小超出可支持范围"))?;
+    let modified_at = system_time_to_string(metadata.modified().ok());
+    let now = now();
+
+    conn.execute(
+        "
+        UPDATE images
+        SET collection_id = ?2,
+            path = ?3,
+            file_name = ?4,
+            extension = ?5,
+            format = ?6,
+            size_bytes = ?7,
+            modified_at = ?8,
+            updated_at = ?9,
+            is_missing = 0
+        WHERE id = ?1
+        ",
+        params![
+            image_id,
+            collection_id,
+            path,
+            file_name,
+            extension,
+            format,
+            size_bytes,
+            modified_at,
+            now
+        ],
+    )?;
+
+    Ok(())
+}
+
+fn create_copied_image_record(
+    conn: &Connection,
+    source: &ImageDto,
+    collection_id: &str,
+    target_path: &Path,
+) -> AppResult<ImageDto> {
+    let path = path_to_string(target_path);
+    let metadata = fs::metadata(target_path)?;
+
+    create_image(
+        conn,
+        CreateImageRequest {
+            collection_id: collection_id.to_string(),
+            path,
+            file_name: Some(source.file_name.clone()),
+            extension: Some(source.extension.clone()),
+            format: Some(source.format.clone()),
+            size_bytes: Some(
+                i64::try_from(metadata.len())
+                    .map_err(|_| AppError::new("validation_error", "文件大小超出可支持范围"))?,
+            ),
+            width: source.width,
+            height: source.height,
+            created_at: system_time_to_string(metadata.created().ok()),
+            modified_at: system_time_to_string(metadata.modified().ok()),
+            sha256: source.sha256.clone(),
+        },
+    )
+}
+
 fn ensure_collection_exists(conn: &Connection, id: &str) -> AppResult<()> {
     let exists = conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM collections WHERE id = ?1 AND deleted_at IS NULL)",
@@ -1057,6 +1237,37 @@ fn default_file_name(path: &str) -> AppResult<String> {
         .and_then(|value| value.to_str())
         .map(ToOwned::to_owned)
         .ok_or_else(|| AppError::new("validation_error", "图片路径缺少文件名"))
+}
+
+fn validate_file_name(value: String) -> AppResult<String> {
+    let value = require_text(value, "文件名")?;
+    if value == "." || value == ".." || value.contains('/') || value.contains('\\') {
+        return Err(AppError::new(
+            "validation_error",
+            "文件名不能包含路径分隔符",
+        ));
+    }
+
+    Ok(value)
+}
+
+fn ensure_supported_image_path(path: &Path) -> AppResult<()> {
+    if scanner::supported_image_format(path).is_some() {
+        Ok(())
+    } else {
+        Err(AppError::new(
+            "validation_error",
+            "目标文件不是支持的图片格式",
+        ))
+    }
+}
+
+fn ensure_destination_available(path: &Path) -> AppResult<()> {
+    if path.exists() {
+        Err(AppError::new("validation_error", "目标位置已存在同名文件"))
+    } else {
+        Ok(())
+    }
 }
 
 fn default_extension(path: &str) -> AppResult<String> {
@@ -1381,6 +1592,115 @@ mod tests {
 
         drop(conn);
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn image_file_operations_update_database_and_disk() {
+        let (database_path, conn) = temp_database();
+        let source_dir = temp_directory("image-source");
+        let target_dir = temp_directory("image-target");
+        let source_path = source_dir.join("first.png");
+        write_png(&source_path, 12, 8);
+
+        let source_collection = create_collection(
+            &conn,
+            CreateCollectionRequest {
+                path: source_dir.to_string_lossy().into_owned(),
+                name: Some("Source".to_string()),
+                description: None,
+                rating: None,
+            },
+        )
+        .expect("source collection should be created");
+        let target_collection = create_collection(
+            &conn,
+            CreateCollectionRequest {
+                path: target_dir.to_string_lossy().into_owned(),
+                name: Some("Target".to_string()),
+                description: None,
+                rating: None,
+            },
+        )
+        .expect("target collection should be created");
+        let image = create_image(
+            &conn,
+            CreateImageRequest {
+                collection_id: source_collection.id.clone(),
+                path: source_path.to_string_lossy().into_owned(),
+                file_name: None,
+                extension: None,
+                format: None,
+                size_bytes: Some(i64::try_from(fs::metadata(&source_path).unwrap().len()).unwrap()),
+                width: Some(12),
+                height: Some(8),
+                created_at: None,
+                modified_at: None,
+                sha256: None,
+            },
+        )
+        .expect("image should be indexed");
+
+        let renamed = rename_image_file(
+            &conn,
+            RenameImageFileRequest {
+                id: image.id.clone(),
+                file_name: "renamed.png".to_string(),
+            },
+        )
+        .expect("image file should rename");
+        assert_eq!(renamed.file_name, "renamed.png");
+        assert!(!source_path.exists());
+        assert!(source_dir.join("renamed.png").exists());
+
+        let copied = copy_image_file(
+            &conn,
+            CopyImageFileRequest {
+                id: renamed.id.clone(),
+                target_collection_id: target_collection.id.clone(),
+            },
+        )
+        .expect("image file should copy");
+        assert_ne!(copied.id, renamed.id);
+        assert_eq!(copied.collection_id, target_collection.id);
+        assert!(target_dir.join("renamed.png").exists());
+
+        delete_image_file(
+            &conn,
+            DeleteImageFileRequest {
+                id: copied.id,
+                use_trash: Some(false),
+            },
+        )
+        .expect("copied image should delete");
+        assert!(!target_dir.join("renamed.png").exists());
+
+        let moved = move_image_file(
+            &conn,
+            MoveImageFileRequest {
+                id: renamed.id.clone(),
+                target_collection_id: target_collection.id.clone(),
+            },
+        )
+        .expect("image file should move");
+        assert_eq!(moved.collection_id, target_collection.id);
+        assert!(!source_dir.join("renamed.png").exists());
+        assert!(target_dir.join("renamed.png").exists());
+
+        delete_image_file(
+            &conn,
+            DeleteImageFileRequest {
+                id: moved.id.clone(),
+                use_trash: Some(false),
+            },
+        )
+        .expect("moved image should delete");
+        assert!(get_image(&conn, &moved.id).unwrap().is_none());
+        assert!(!target_dir.join("renamed.png").exists());
+
+        drop(conn);
+        let _ = fs::remove_file(database_path);
+        let _ = fs::remove_dir_all(source_dir);
+        let _ = fs::remove_dir_all(target_dir);
     }
 
     #[test]

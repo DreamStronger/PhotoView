@@ -10,11 +10,12 @@ pub mod thumbs;
 mod viewer;
 
 use commands::data::{
-    clear_thumbnail_cache, create_collection, create_image, create_tag, delete_collection_record,
-    delete_image_record, delete_tag, enqueue_thumbnail_generation, get_collection, get_image,
-    get_setting, get_settings, get_tag, get_task, get_thumbnail, get_thumbnail_cache_stats,
-    get_viewer_image, import_collection, list_collections, list_images, list_tags,
-    mark_collection_viewed, update_collection, update_image, update_setting, update_tag,
+    clear_thumbnail_cache, copy_image_file, create_collection, create_image, create_tag,
+    delete_collection_record, delete_image_file, delete_image_record, delete_tag,
+    enqueue_thumbnail_generation, get_collection, get_image, get_setting, get_settings, get_tag,
+    get_task, get_thumbnail, get_thumbnail_cache_stats, get_viewer_image, import_collection,
+    list_collections, list_images, list_tags, mark_collection_viewed, move_image_file,
+    rename_image_file, update_collection, update_image, update_setting, update_tag,
 };
 use commands::system::{
     choose_import_folder, copy_path_to_clipboard, copy_text_to_clipboard, get_app_status,
@@ -73,6 +74,10 @@ pub fn run() {
             create_image,
             update_image,
             delete_image_record,
+            rename_image_file,
+            move_image_file,
+            copy_image_file,
+            delete_image_file,
             list_tags,
             get_tag,
             create_tag,

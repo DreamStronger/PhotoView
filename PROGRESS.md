@@ -3,8 +3,8 @@
 ## Current
 
 - 阶段：阶段 3，管理能力。
-- 正在做：合集编辑、收藏/最近查看和删除记录已完成。
-- 下一步：实现图片单图管理、批量管理、右键菜单和拖拽操作。
+- 正在做：合集管理和图片单图管理已完成。
+- 下一步：实现图片批量管理、右键菜单和拖拽操作。
 
 ## Done
 
@@ -45,6 +45,8 @@
 - 已完成格式兼容单元测试：`cargo test` 20 项通过，覆盖 AVIF/SVG 入库策略、常见栅格格式查看器预览和 AVIF/GIF/SVG 源文件查看策略。
 - 已实现合集管理：可编辑名称、描述、评分，能从图片列表设置封面，收藏状态同步 `favorites` 表，打开合集会更新最近查看和查看次数，删除合集记录前确认且保留磁盘文件夹。
 - 已完成本轮验证：`pnpm build` 通过，`cargo fmt --check` 通过，`cargo test` 20 项通过，`pnpm tauri build --debug --bundles app` 通过，Playwright 桌面/移动空态冒烟无横向溢出。
+- 已实现图片单图管理：图片行可重命名、移动到其他合集、复制到其他合集、删除到系统回收站；Rust command 会同步磁盘文件和数据库记录，并有文件名/目标冲突校验。
+- 已完成本轮验证：`pnpm build` 通过，`cargo fmt --check` 通过，`cargo test` 21 项通过，`pnpm tauri build --debug --bundles app` 通过，Playwright 桌面/移动空态冒烟无横向溢出。
 
 ## Blocked
 

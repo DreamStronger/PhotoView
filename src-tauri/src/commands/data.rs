@@ -3,9 +3,10 @@ use crate::{
     db::repositories,
     errors::{AppError, AppResult},
     models::{
-        ClearThumbnailCacheResult, CollectionDto, CreateCollectionRequest, CreateImageRequest,
-        CreateTagRequest, ImageDto, ImportCollectionRequest, ImportCollectionResult,
-        ListImagesRequest, SettingDto, TagDto, TaskDto, ThumbnailCacheStatsDto, ThumbnailDto,
+        ClearThumbnailCacheResult, CollectionDto, CopyImageFileRequest, CreateCollectionRequest,
+        CreateImageRequest, CreateTagRequest, DeleteImageFileRequest, ImageDto,
+        ImportCollectionRequest, ImportCollectionResult, ListImagesRequest, MoveImageFileRequest,
+        RenameImageFileRequest, SettingDto, TagDto, TaskDto, ThumbnailCacheStatsDto, ThumbnailDto,
         ThumbnailTaskRequest, UpdateCollectionRequest, UpdateImageRequest, UpdateSettingRequest,
         UpdateTagRequest, ViewerImageDto,
     },
@@ -102,6 +103,38 @@ pub fn update_image(
 #[tauri::command]
 pub fn delete_image_record(state: State<'_, AppState>, id: String) -> AppResult<()> {
     state.with_db(|db| repositories::delete_image_record(db, &id))
+}
+
+#[tauri::command]
+pub fn rename_image_file(
+    state: State<'_, AppState>,
+    request: RenameImageFileRequest,
+) -> AppResult<ImageDto> {
+    state.with_db(|db| repositories::rename_image_file(db, request))
+}
+
+#[tauri::command]
+pub fn move_image_file(
+    state: State<'_, AppState>,
+    request: MoveImageFileRequest,
+) -> AppResult<ImageDto> {
+    state.with_db(|db| repositories::move_image_file(db, request))
+}
+
+#[tauri::command]
+pub fn copy_image_file(
+    state: State<'_, AppState>,
+    request: CopyImageFileRequest,
+) -> AppResult<ImageDto> {
+    state.with_db(|db| repositories::copy_image_file(db, request))
+}
+
+#[tauri::command]
+pub fn delete_image_file(
+    state: State<'_, AppState>,
+    request: DeleteImageFileRequest,
+) -> AppResult<()> {
+    state.with_db(|db| repositories::delete_image_file(db, request))
 }
 
 #[tauri::command]

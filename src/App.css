@@ -389,10 +389,10 @@ nav {
   left: 0;
   right: 0;
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(260px, auto);
   gap: 12px;
   align-items: center;
-  height: 78px;
+  height: 124px;
   border-bottom: 1px solid #eef2f6;
   padding: 10px 12px;
 }
@@ -846,7 +846,7 @@ nav {
 
   .image-row {
     grid-template-columns: 44px minmax(0, 1fr);
-    height: 96px;
+    height: 124px;
   }
 
   .image-thumb-placeholder {

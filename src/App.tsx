@@ -15,6 +15,7 @@ import {
   Info,
   List,
   Maximize2,
+  MoveRight,
   Pause,
   Pencil,
   Play,
@@ -183,7 +184,7 @@ function App() {
   const imageVirtualizer = useVirtualizer({
     count: images.length,
     getScrollElement: () => imageListRef.current,
-    estimateSize: () => 78,
+    estimateSize: () => 124,
     overscan: 8,
   });
 
@@ -606,6 +607,143 @@ function App() {
     }
   }
 
+  async function renameImage(image: ImageRecord) {
+    const fileName = window.prompt("新的文件名", image.fileName)?.trim();
+    if (!fileName || fileName === image.fileName) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+
+    if (!isTauriRuntime()) {
+      setNotice("请在桌面应用中重命名图片");
+      return;
+    }
+
+    try {
+      const updated = await invoke<ImageRecord>("rename_image_file", {
+        request: { id: image.id, fileName },
+      });
+      setImages((current) => current.map((item) => (item.id === image.id ? updated : item)));
+      await refreshCollections();
+      setNotice("图片已重命名");
+    } catch (value) {
+      setError(invokeErrorMessage(value));
+    }
+  }
+
+  async function moveImage(image: ImageRecord) {
+    const target = chooseTargetCollection("移动到合集");
+    if (!target) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+
+    if (!isTauriRuntime()) {
+      setNotice("请在桌面应用中移动图片");
+      return;
+    }
+
+    try {
+      await invoke<ImageRecord>("move_image_file", {
+        request: { id: image.id, targetCollectionId: target.id },
+      });
+      setImages((current) => current.filter((item) => item.id !== image.id));
+      setThumbnails((current) => omitKey(current, image.id));
+      setThumbnailErrors((current) => omitKey(current, image.id));
+      thumbnailRequests.current.delete(image.id);
+      await refreshCollections();
+      await refreshStatus();
+      setNotice(`图片已移动到 ${target.name}`);
+    } catch (value) {
+      setError(invokeErrorMessage(value));
+    }
+  }
+
+  async function copyImage(image: ImageRecord) {
+    const target = chooseTargetCollection("复制到合集");
+    if (!target) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+
+    if (!isTauriRuntime()) {
+      setNotice("请在桌面应用中复制图片");
+      return;
+    }
+
+    try {
+      await invoke<ImageRecord>("copy_image_file", {
+        request: { id: image.id, targetCollectionId: target.id },
+      });
+      await refreshCollections();
+      await refreshStatus();
+      setNotice(`图片已复制到 ${target.name}`);
+    } catch (value) {
+      setError(invokeErrorMessage(value));
+    }
+  }
+
+  async function deleteImage(image: ImageRecord) {
+    if (!window.confirm(`删除图片“${image.fileName}”？默认移到系统回收站。`)) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+
+    if (!isTauriRuntime()) {
+      setNotice("请在桌面应用中删除图片");
+      return;
+    }
+
+    try {
+      await invoke("delete_image_file", {
+        request: { id: image.id, useTrash: true },
+      });
+      setImages((current) => current.filter((item) => item.id !== image.id));
+      setThumbnails((current) => omitKey(current, image.id));
+      setThumbnailErrors((current) => omitKey(current, image.id));
+      thumbnailRequests.current.delete(image.id);
+      if (activeImage?.id === image.id) {
+        closeViewer();
+      }
+      await refreshCollections();
+      await refreshStatus();
+      setNotice("图片已移到回收站");
+    } catch (value) {
+      setError(invokeErrorMessage(value));
+    }
+  }
+
+  function chooseTargetCollection(title: string): Collection | null {
+    const candidates = collections.filter((collection) => collection.id !== selectedCollectionId);
+    if (candidates.length === 0) {
+      setNotice("没有可用目标合集");
+      return null;
+    }
+
+    const options = candidates
+      .map((collection, index) => `${index + 1}. ${collection.name}`)
+      .join("\n");
+    const value = window.prompt(`${title}\n${options}`)?.trim();
+    if (!value) {
+      return null;
+    }
+
+    const index = Number(value);
+    if (Number.isInteger(index) && index >= 1 && index <= candidates.length) {
+      return candidates[index - 1];
+    }
+
+    return candidates.find((collection) => collection.id === value) ?? null;
+  }
+
   async function deleteSelectedCollectionRecord() {
     if (!selectedCollection) {
       return;
@@ -878,6 +1016,54 @@ function App() {
                               ) : (
                                 <ImagePlus size={14} aria-hidden="true" />
                               )}
+                            </button>
+                            <button
+                              aria-label="重命名图片"
+                              className="icon-button compact"
+                              title="重命名图片"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void renameImage(image);
+                              }}
+                            >
+                              <Pencil size={14} aria-hidden="true" />
+                            </button>
+                            <button
+                              aria-label="移动图片"
+                              className="icon-button compact"
+                              title="移动图片"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void moveImage(image);
+                              }}
+                            >
+                              <MoveRight size={14} aria-hidden="true" />
+                            </button>
+                            <button
+                              aria-label="复制图片"
+                              className="icon-button compact"
+                              title="复制图片"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void copyImage(image);
+                              }}
+                            >
+                              <Copy size={14} aria-hidden="true" />
+                            </button>
+                            <button
+                              aria-label="删除图片"
+                              className="icon-button compact danger"
+                              title="删除图片"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void deleteImage(image);
+                              }}
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
                             </button>
                           </div>
                         </article>
@@ -1380,6 +1566,12 @@ function clamp(value: number, min: number, max: number): number {
 
 function convertImagePath(path: string): string {
   return isTauriRuntime() ? convertFileSrc(path) : path;
+}
+
+function omitKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
 }
 
 export default App;
