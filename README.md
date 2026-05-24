@@ -147,9 +147,9 @@ pnpm tauri build --bundles nsis,msi
 pnpm tauri build --bundles deb,appimage
 ```
 
-构建产物位于 `src-tauri/target/release/bundle/`。CI 会在 tag `v*` 推送时为 macOS、Windows、Linux 构建发布产物。
+构建产物位于 `src-tauri/target/release/bundle/`。推送 tag `v*` 会触发发布工作流，为 macOS、Windows、Linux 构建产物，并上传到对应 GitHub Release。
 
-Build artifacts are written to `src-tauri/target/release/bundle/`. CI builds release artifacts for macOS, Windows, and Linux when a `v*` tag is pushed.
+Build artifacts are written to `src-tauri/target/release/bundle/`. Pushing a `v*` tag triggers the release workflow, builds artifacts for macOS, Windows, and Linux, and uploads them to the matching GitHub Release.
 
 ## 各平台安装与启动 / Install and Launch on Each Platform
 
@@ -229,9 +229,9 @@ After generation, import `fixtures/bench-1000` in the desktop app to measure imp
 
 ## 发布说明 / Release Notes
 
-`.github/workflows/release.yml` 会在推送 `v*` tag 时构建：
+`.github/workflows/release.yml` 会在推送 `v*` tag 时创建 GitHub Release，并构建上传：
 
-`.github/workflows/release.yml` builds the following artifacts when a `v*` tag is pushed:
+`.github/workflows/release.yml` creates a GitHub Release when a `v*` tag is pushed, then builds and uploads:
 
 - macOS: `app`, `dmg`
 - Windows: `nsis`, `msi`
