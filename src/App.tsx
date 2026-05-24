@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Copy, ExternalLink, FolderPlus } from "lucide-react";
 import "./App.css";
 
@@ -34,9 +35,24 @@ function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedImportPath, setSelectedImportPath] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const importInFlight = useRef(false);
 
   useEffect(() => {
-    refreshStatus();
+    void refreshStatus();
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen("menu-import-folder", () => {
+      void handleChooseImportFolder();
+    }).then((value) => {
+      unlisten = value;
+    });
+
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   async function refreshStatus() {
@@ -46,6 +62,11 @@ function App() {
   }
 
   async function handleChooseImportFolder() {
+    if (importInFlight.current) {
+      return;
+    }
+
+    importInFlight.current = true;
     setError(null);
     setNotice(null);
     setIsImporting(true);
@@ -71,6 +92,7 @@ function App() {
     } catch (value) {
       setError(invokeErrorMessage(value));
     } finally {
+      importInFlight.current = false;
       setIsImporting(false);
     }
   }

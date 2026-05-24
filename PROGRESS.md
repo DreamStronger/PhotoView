@@ -2,9 +2,9 @@
 
 ## Current
 
-- 阶段：阶段 1，基础工程。
-- 正在做：应用初始化、SQLite schema migration、系统能力、基础 CRUD、图片扫描和导入入库已完成。
-- 下一步：完成窗口、菜单、应用图标和基础权限配置，收尾阶段 1。
+- 阶段：阶段 1，基础工程已完成；准备进入阶段 2。
+- 正在做：阶段 1 所有 TODO 已完成，阶段级验证通过，等待 push。
+- 下一步：阶段 2 先实现缩略图生成与基础浏览界面，再推进查看器。
 
 ## Done
 
@@ -16,6 +16,7 @@
 - 已确定并初始化技术栈：Tauri 2、Rust 1.95.0、React 19、TypeScript、Vite、pnpm、SQLite/rusqlite。
 - 已安装基础依赖：Tauri dialog/fs/opener 插件、rusqlite、image、kamadak-exif、notify、trash、walkdir、sha2、uuid、chrono、zustand、react-virtual、lucide-react、clsx。
 - 已安装剪贴板依赖：`@tauri-apps/plugin-clipboard-manager`、`tauri-plugin-clipboard-manager`。
+- 已完成主窗口配置、应用图标 bundle 配置、基础 CSP、Tauri capability 和原生命令菜单；菜单“导入文件夹”会触发现有导入流程。
 - 已完成基础验证：`pnpm build` 通过，`cargo check` 通过，`cargo fmt --check` 通过。
 - 已配置应用标识 `com.dreamstronger.photoview`、产品名 `PhotoView`、主窗口 1200x800，并注册 dialog/fs/opener 插件。
 - 已新增 `docs/ARCHITECTURE.md`，锁定 Rust command/API、数据库、缩略图缓存、配置目录、后台任务和前端状态边界。
@@ -27,8 +28,9 @@
 - 已实现 collections、images、tags、settings 基础 CRUD repository 和 Tauri command，并补充 Rust 单元测试。
 - 已新增 `scanner` 模块，支持 jpg/jpeg、png、gif、bmp、ico、tiff/tif、webp、avif、svg 识别，递归扫描不跟随符号链接，并提取文件大小、创建时间、修改时间、分辨率和格式；异常图片返回结构化错误。
 - 已实现 `import_collection` command：选择文件夹后扫描入库，重复路径执行更新，避免重复入库，并刷新合集图片数量和总大小。
-- 已完成本轮验证：`pnpm build` 通过，`cargo test` 通过，`cargo fmt --check` 通过。
+- 已完成本轮验证：`pnpm build` 通过，`cargo test` 通过，`cargo fmt --check` 通过，`pnpm tauri build --debug --bundles app` 通过。
 
 ## Blocked
 
 - 当前 macOS 机器仅安装 Xcode Command Line Tools，`tauri info` 提示完整 Xcode 未安装；后续 macOS 打包/签名前需要处理。
+- `pnpm tauri build --debug` 可生成 `.app`，但完整 DMG 打包在 `bundle_dmg.sh` 阶段失败；阶段 5 发布打包时需补充排查。

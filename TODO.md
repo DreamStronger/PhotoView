@@ -13,7 +13,7 @@
 ## 阶段 1：基础工程
 
 - [x] Tauri 工程 subagent：初始化 Tauri 跨平台项目结构。
-- [ ] Tauri 工程 subagent：配置窗口、菜单、应用图标、基础权限。
+- [x] Tauri 工程 subagent：配置窗口、菜单、应用图标、基础权限。
 - [x] Tauri 工程 subagent：封装文件夹选择、打开文件所在位置、复制路径等系统能力。
 - [x] 数据库 subagent：设计 collections、images、tags、favorites、history、settings 表结构。
 - [x] 数据库 subagent：实现 schema migration。
