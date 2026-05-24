@@ -4,6 +4,7 @@ mod db;
 mod errors;
 mod models;
 mod paths;
+pub mod scanner;
 
 use commands::data::{
     create_collection, create_image, create_tag, delete_collection_record, delete_image_record,
