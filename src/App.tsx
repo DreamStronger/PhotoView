@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   type DragEvent,
   type FormEvent,
+  type UIEvent,
   useEffect,
   useMemo,
   useRef,
@@ -226,6 +227,7 @@ type TagAssignmentTarget =
   | { kind: "batch"; images: ImageRecord[] };
 
 const SEARCH_FORMATS = ["jpg", "png", "gif", "webp", "avif", "svg", "bmp", "tiff", "ico"];
+const COLLECTION_BATCH_SIZE = 80;
 
 function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
@@ -278,6 +280,7 @@ function App() {
   const [searchFavorite, setSearchFavorite] = useState("any");
   const [sortKey, setSortKey] = useState<CollectionSortKey>("imported");
   const [viewMode, setViewMode] = useState<CollectionViewMode>("grid");
+  const [collectionRenderLimit, setCollectionRenderLimit] = useState(COLLECTION_BATCH_SIZE);
   const [imageViewMode, setImageViewMode] = useState<ImageViewMode>("list");
   const [imageGridColumnCount, setImageGridColumnCount] = useState(4);
   const [isCollectionEditorOpen, setIsCollectionEditorOpen] = useState(false);
@@ -329,7 +332,9 @@ function App() {
     );
   }, [imageTagMap, images, selectedTagFilterId]);
   const activeImage = viewerIndex === null ? null : visibleImages[viewerIndex] ?? null;
-  const gridTileWidth = Math.max(144, Math.round(numberOrNull(thumbnailSize) ?? 192) + 36);
+  const thumbnailSizeNumber = clamp(Math.round(numberOrNull(thumbnailSize) ?? 192), 64, 512);
+  const listThumbnailSize = clamp(Math.round(thumbnailSizeNumber * 0.36), 52, 96);
+  const gridTileWidth = Math.max(144, thumbnailSizeNumber + 36);
   const imageVirtualCount =
     imageViewMode === "grid"
       ? Math.ceil(visibleImages.length / imageGridColumnCount)
@@ -395,14 +400,19 @@ function App() {
 
     return [...filtered].sort((left, right) => compareCollections(left, right, sortKey));
   }, [activeView, collectionTagMap, collections, query, selectedTagFilterId, sortKey]);
+  const renderedCollections = useMemo(
+    () => visibleCollections.slice(0, collectionRenderLimit),
+    [collectionRenderLimit, visibleCollections],
+  );
+  const hasMoreCollections = renderedCollections.length < visibleCollections.length;
 
   const imageVirtualizer = useVirtualizer({
     count: imageVirtualCount,
     getScrollElement: () => imageListRef.current,
     estimateSize: () =>
       imageViewMode === "grid"
-        ? Math.max(172, Math.round(numberOrNull(thumbnailSize) ?? 192) + 58)
-        : Math.max(124, Math.round(numberOrNull(thumbnailSize) ?? 192) + 72),
+        ? Math.max(172, thumbnailSizeNumber + 58)
+        : Math.max(104, listThumbnailSize + 40),
     overscan: 8,
   });
 
@@ -493,11 +503,11 @@ function App() {
   }, [gridTileWidth, imageViewMode, selectedCollectionId]);
 
   useEffect(() => {
-    if (!isTauriRuntime() || visibleCollections.length === 0) {
+    if (!isTauriRuntime() || renderedCollections.length === 0) {
       return;
     }
 
-    for (const collection of visibleCollections) {
+    for (const collection of renderedCollections) {
       if (!collection.coverImageId) {
         continue;
       }
@@ -514,7 +524,11 @@ function App() {
       collectionCoverRequests.current.add(requestKey);
       void loadCollectionCover(collection, requestKey);
     }
-  }, [collectionCoverErrors, collectionCovers, thumbnailSize, visibleCollections]);
+  }, [collectionCoverErrors, collectionCovers, renderedCollections, thumbnailSize]);
+
+  useEffect(() => {
+    setCollectionRenderLimit(COLLECTION_BATCH_SIZE);
+  }, [activeView, query, selectedTagFilterId, sortKey, viewMode]);
 
   useEffect(() => {
     if (!isTauriRuntime()) {
@@ -1108,6 +1122,41 @@ function App() {
 
   function clearSearchResults() {
     setSearchResults(null);
+  }
+
+  function resetSearchFilters() {
+    setSearchFormats([]);
+    setSearchTagIds([]);
+    setSearchMinWidth("");
+    setSearchMaxWidth("");
+    setSearchMinHeight("");
+    setSearchMaxHeight("");
+    setSearchMinSizeMb("");
+    setSearchMaxSizeMb("");
+    setSearchMinRating("");
+    setSearchMaxRating("");
+    setSearchDateFrom("");
+    setSearchDateTo("");
+    setSearchFavorite("any");
+    setSearchResults(null);
+    setNotice("筛选条件已清空");
+  }
+
+  function loadMoreCollections() {
+    setCollectionRenderLimit((current) =>
+      Math.min(current + COLLECTION_BATCH_SIZE, visibleCollections.length),
+    );
+  }
+
+  function handleCollectionSurfaceScroll(event: UIEvent<HTMLElement>) {
+    if (!hasMoreCollections) {
+      return;
+    }
+
+    const element = event.currentTarget;
+    if (element.scrollTop + element.clientHeight >= element.scrollHeight - 240) {
+      loadMoreCollections();
+    }
   }
 
   function openSearchCollection(collection: Collection) {
@@ -2258,6 +2307,14 @@ function App() {
                   <option value="plain">未收藏</option>
                 </select>
               </label>
+              <div className="advanced-search-actions">
+                <button className="primary-action" type="button" onClick={() => void performSearch()}>
+                  应用筛选
+                </button>
+                <button className="secondary-action" type="button" onClick={resetSearchFilters}>
+                  重置
+                </button>
+              </div>
             </section>
           ) : null}
 
@@ -2943,7 +3000,7 @@ function App() {
                 <h1>{collectionViewTitle(activeView, selectedTagFilterId, tags)}</h1>
                 <span>
                   {status
-                    ? `${visibleCollections.length}/${status.collection_count} 个合集`
+                    ? `${renderedCollections.length}/${visibleCollections.length}/${status.collection_count} 个合集`
                     : "初始化中"}
                 </span>
               </div>
@@ -2997,126 +3054,141 @@ function App() {
                 </div>
               </div>
 
-              <section className={`collection-surface ${viewMode}`} aria-busy={collectionsLoading}>
+              <section
+                className={`collection-surface ${viewMode}`}
+                aria-busy={collectionsLoading}
+                onScroll={handleCollectionSurfaceScroll}
+              >
                 {collectionsLoading ? (
                   <div className="empty-state">
                     <h2>加载中</h2>
                     <p>正在读取本地合集索引。</p>
                   </div>
                 ) : visibleCollections.length > 0 ? (
-                  visibleCollections.map((collection) => (
-                    <article
-                      className="collection-card"
-                      key={collection.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openCollection(collection)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          openCollection(collection);
-                        }
-                      }}
-                    >
-                      <div className="collection-cover">
-                        {collectionCovers[collection.id] ? (
-                          <img
-                            alt=""
-                            src={convertFileSrc(collectionCovers[collection.id].cachePath)}
-                          />
-                        ) : (
-                          <Images size={24} aria-hidden="true" />
-                        )}
-                      </div>
-                      <div className="collection-main">
-                        <div className="collection-title-row">
-                          <h2>{collection.name}</h2>
-                          {collection.isFavorite ? <Star size={15} aria-label="已收藏" /> : null}
+                  <>
+                    {renderedCollections.map((collection) => (
+                      <article
+                        className="collection-card"
+                        key={collection.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openCollection(collection)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            openCollection(collection);
+                          }
+                        }}
+                      >
+                        <div className="collection-cover">
+                          {collectionCovers[collection.id] ? (
+                            <img
+                              alt=""
+                              src={convertFileSrc(collectionCovers[collection.id].cachePath)}
+                            />
+                          ) : (
+                            <Images size={24} aria-hidden="true" />
+                          )}
                         </div>
-                        <p>{collection.path}</p>
-                        {(collectionTagMap[collection.id] ?? []).length > 0 ? (
-                          <div className="tag-chip-row" aria-label="合集标签">
-                            {(collectionTagMap[collection.id] ?? []).map((tag) => (
-                              <span className="tag-chip compact" key={tag.id} style={tagChipStyle(tag)}>
-                                {tag.name}
-                              </span>
-                            ))}
+                        <div className="collection-main">
+                          <div className="collection-title-row">
+                            <h2>{collection.name}</h2>
+                            {collection.isFavorite ? <Star size={15} aria-label="已收藏" /> : null}
                           </div>
-                        ) : null}
-                        <div className="collection-meta">
-                          <span>{collection.imageCount} 张</span>
-                          <span>{formatBytes(collection.totalSizeBytes)}</span>
-                          <span>{formatDate(collection.importedAt)}</span>
-                          <span>评分 {collection.rating}/5</span>
+                          <p>{collection.path}</p>
+                          {(collectionTagMap[collection.id] ?? []).length > 0 ? (
+                            <div className="tag-chip-row" aria-label="合集标签">
+                              {(collectionTagMap[collection.id] ?? []).map((tag) => (
+                                <span
+                                  className="tag-chip compact"
+                                  key={tag.id}
+                                  style={tagChipStyle(tag)}
+                                >
+                                  {tag.name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                          <div className="collection-meta">
+                            <span>{collection.imageCount} 张</span>
+                            <span>{formatBytes(collection.totalSizeBytes)}</span>
+                            <span>{formatDate(collection.importedAt)}</span>
+                            <span>评分 {collection.rating}/5</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="collection-actions">
-                        <button
-                          aria-label={collection.isFavorite ? "取消收藏合集" : "收藏合集"}
-                          className="icon-button"
-                          title={collection.isFavorite ? "取消收藏合集" : "收藏合集"}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void toggleCollectionFavorite(collection);
-                          }}
-                        >
-                          <Star
-                            size={16}
-                            aria-hidden="true"
-                            fill={collection.isFavorite ? "currentColor" : "none"}
-                          />
-                        </button>
-                        <button
-                          aria-label="设置合集标签"
-                          className="icon-button secondary-card-action"
-                          title="设置合集标签"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void assignTagsToCollection(collection);
-                          }}
-                        >
-                          <TagIcon size={16} aria-hidden="true" />
-                        </button>
-                        <button
-                          aria-label="复制路径"
-                          className="icon-button secondary-card-action"
-                          title="复制路径"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void copyPath(collection.path);
-                          }}
-                        >
-                          <Copy size={16} aria-hidden="true" />
-                        </button>
-                        <button
-                          aria-label="打开所在位置"
-                          className="icon-button secondary-card-action"
-                          title="打开所在位置"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void openPath(collection.path);
-                          }}
-                        >
-                          <ExternalLink size={16} aria-hidden="true" />
-                        </button>
-                        <button
-                          aria-label="删除合集记录"
-                          className="icon-button danger secondary-card-action"
-                          title="删除合集记录"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void deleteCollectionRecord(collection);
-                          }}
-                        >
-                          <Trash2 size={16} aria-hidden="true" />
-                        </button>
-                      </div>
-                    </article>
-                  ))
+                        <div className="collection-actions">
+                          <button
+                            aria-label={collection.isFavorite ? "取消收藏合集" : "收藏合集"}
+                            className="icon-button"
+                            title={collection.isFavorite ? "取消收藏合集" : "收藏合集"}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void toggleCollectionFavorite(collection);
+                            }}
+                          >
+                            <Star
+                              size={16}
+                              aria-hidden="true"
+                              fill={collection.isFavorite ? "currentColor" : "none"}
+                            />
+                          </button>
+                          <button
+                            aria-label="设置合集标签"
+                            className="icon-button secondary-card-action"
+                            title="设置合集标签"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void assignTagsToCollection(collection);
+                            }}
+                          >
+                            <TagIcon size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            aria-label="复制路径"
+                            className="icon-button secondary-card-action"
+                            title="复制路径"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void copyPath(collection.path);
+                            }}
+                          >
+                            <Copy size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            aria-label="打开所在位置"
+                            className="icon-button secondary-card-action"
+                            title="打开所在位置"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void openPath(collection.path);
+                            }}
+                          >
+                            <ExternalLink size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            aria-label="删除合集记录"
+                            className="icon-button danger secondary-card-action"
+                            title="删除合集记录"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void deleteCollectionRecord(collection);
+                            }}
+                          >
+                            <Trash2 size={16} aria-hidden="true" />
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                    {hasMoreCollections ? (
+                      <button className="load-more-collections" type="button" onClick={loadMoreCollections}>
+                        加载更多合集
+                      </button>
+                    ) : null}
+                  </>
                 ) : (
                   <div className="empty-state">
                     <h2>{collections.length > 0 ? "没有匹配合集" : "暂无合集"}</h2>
@@ -3415,13 +3487,14 @@ function App() {
                       <input
                         checked={tagAssignmentIds.includes(tag.id)}
                         type="checkbox"
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const checked = event.currentTarget.checked;
                           setTagAssignmentIds((current) =>
-                            event.currentTarget.checked
+                            checked
                               ? [...current, tag.id]
                               : current.filter((id) => id !== tag.id),
-                          )
-                        }
+                          );
+                        }}
                       />
                       <span className="tag-dot" style={{ background: tag.color }} />
                       <strong>{tag.name}</strong>
@@ -3847,8 +3920,12 @@ function tagChipStyle(tag: PhotoTag) {
 }
 
 function appShellStyle(thumbnailSize: string): CSSProperties {
+  const gridSize = clamp(Math.round(numberOrNull(thumbnailSize) ?? 192), 64, 512);
+  const listSize = clamp(Math.round(gridSize * 0.36), 52, 96);
+
   return {
-    "--thumb-size": `${clamp(Math.round(numberOrNull(thumbnailSize) ?? 192), 64, 512)}px`,
+    "--thumb-size": `${gridSize}px`,
+    "--list-thumb-size": `${listSize}px`,
   } as CSSProperties;
 }
 

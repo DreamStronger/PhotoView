@@ -3,8 +3,8 @@
 ## Current
 
 - 阶段：阶段 6，性能、功能问题修复。
-- 正在做：阶段 6 最新 TODO 已实现并通过 iteration 复审，准备提交、push、merge。
-- 下一步：提交并 push `development`，合并到 `master`；发布 tag 需先确认远端既有 `v0.1.1` 的处理方式。
+- 正在做：最新 `development` TODO 修复已通过 QA subagent 复审，准备提交、push、merge 和发布 `v0.1.3`。
+- 下一步：提交并 push `development`，合并到 `master`，推送 `v0.1.3` tag。
 
 ## Done
 
@@ -92,10 +92,13 @@
 - 已优化多层大目录导入：先发现目录并发送准备进度，再逐目录直接扫描，异常子目录跳过不中断；导入阶段 `totalCount` 表示待导入合集数；删除合集时撤销全部历史图片路径的 asset 文件授权。
 - 已完成最新 iteration 复审：UI/UX subagent 和技术 subagent 最终均无高/中优先级意见。
 - 已完成最新验证：`pnpm test` 9 项通过，`pnpm build` 通过，`cargo fmt --check` 通过，`cargo test` 26 项通过、1 项忽略，`cargo test fixture_acceptance_core_flow -- --ignored` 通过，`pnpm tauri build --debug --bundles app` 通过；Playwright 移动端本地冒烟无控制台错误、无横向溢出，测试页面和 dev server 已关闭。
+- 已完成最新 `development` TODO 修复：标签下拉点击白屏通过提前捕获 checkbox checked 状态修复并补回归测试；列表竖图缩略图改用紧凑尺寸和 contain；查看器画布允许滚动并修正实际大小模式起始位置；合集列表改为分批渲染和封面按已渲染项加载；高级筛选增加应用/重置操作。
+- 已 bump 版本到 `0.1.3`：`package.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock`、`src-tauri/tauri.conf.json`。
+- 已完成本轮验证：`pnpm test` 10 项通过，`pnpm build` 通过，`cargo fmt --check` 通过，`cargo test` 26 项通过、1 项忽略，`cargo test fixture_acceptance_core_flow -- --ignored` 通过，`pnpm tauri build --debug --bundles app` 通过；Playwright 冒烟通过，桌面/移动无横向溢出、无 console/page error，测试浏览器和 dev server 已关闭。
+- QA subagent 复审结论：无高/中优先级问题；低风险为合集仍是前端分批渲染而非后端分页、竖图修复主要依赖 CSS 和 Playwright 冒烟。
 
 ## Blocked
 
 - 当前 macOS 机器仅安装 Xcode Command Line Tools，`tauri info` 提示完整 Xcode 未安装；后续 macOS 打包/签名前需要处理。
 - `pnpm tauri build --debug` 可生成 `.app`，但完整 DMG 打包在 `bundle_dmg.sh` 阶段失败；阶段 5 发布打包时需补充排查。
 - 代码签名、公证和自动更新签名需要证书、Apple 账号、Windows 证书以及 `TAURI_SIGNING_PRIVATE_KEY` 等 GitHub Secrets。
-- 远端 `v0.1.1` tag 已存在且指向旧提交 `dae2789`；当前修复发布需要确认新版本 tag 或是否覆盖旧 tag。

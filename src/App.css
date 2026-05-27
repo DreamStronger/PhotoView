@@ -362,6 +362,16 @@ button {
   min-height: 82px;
 }
 
+.advanced-search-actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.advanced-search-actions button {
+  min-height: 36px;
+}
+
 .settings-actions {
   display: flex;
   flex-wrap: wrap;
@@ -658,6 +668,24 @@ button {
   box-shadow: 0 16px 34px rgb(37 99 235 / 10%);
   outline: 0;
   transform: translateY(-1px);
+}
+
+.load-more-collections {
+  border: 1px solid #cfd7e2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #205493;
+  font-weight: 600;
+  padding: 10px 14px;
+}
+
+.collection-surface.grid .load-more-collections {
+  grid-column: 1 / -1;
+}
+
+.load-more-collections:hover {
+  border-color: #9db5d0;
+  background: #f6f9fc;
 }
 
 .collection-surface.grid .collection-card {
@@ -1126,10 +1154,10 @@ button {
   left: 0;
   right: 0;
   display: grid;
-  grid-template-columns: 28px var(--thumb-size, 52px) minmax(0, 1fr) minmax(220px, auto);
+  grid-template-columns: 28px var(--list-thumb-size, 64px) minmax(0, 1fr) minmax(220px, auto);
   gap: 12px;
   align-items: center;
-  height: max(108px, calc(var(--thumb-size, 52px) + 48px));
+  height: max(104px, calc(var(--list-thumb-size, 64px) + 40px));
   border-bottom: 1px solid #eef2f6;
   padding: 10px 12px;
 }
@@ -1162,19 +1190,20 @@ button {
 
 .image-thumb-placeholder {
   display: grid;
-  width: var(--thumb-size, 52px);
-  height: var(--thumb-size, 52px);
+  width: var(--list-thumb-size, 64px);
+  height: var(--list-thumb-size, 64px);
   place-items: center;
   border-radius: 7px;
   background: #f0f4f8;
   color: #526173;
+  overflow: hidden;
 }
 
 .image-thumb-placeholder img {
   width: 100%;
   height: 100%;
   border-radius: 7px;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .image-row-main {
@@ -1622,15 +1651,16 @@ button {
 .viewer-canvas {
   position: relative;
   display: grid;
+  box-sizing: border-box;
   min-width: 0;
   min-height: 0;
   place-items: center;
-  overflow: hidden;
+  overflow: auto;
   padding: 56px 72px;
 }
 
 .viewer-canvas.actual {
-  overflow: auto;
+  place-items: start center;
 }
 
 .viewer-canvas img {
@@ -1645,18 +1675,19 @@ button {
 .viewer-canvas img.fit {
   width: auto;
   height: auto;
-  max-width: min(100%, calc(100vw - 160px));
-  max-height: min(100%, calc(100vh - 180px));
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
 }
 
 .viewer-stage.with-info .viewer-canvas img.fit {
-  max-width: min(100%, calc(100vw - 440px));
+  max-width: 100%;
 }
 
 .viewer-canvas img.actual {
   max-width: none;
   max-height: none;
+  transform-origin: top center;
 }
 
 .viewer-placeholder {
@@ -1962,8 +1993,8 @@ button {
 
   .viewer-canvas img.fit,
   .viewer-stage.with-info .viewer-canvas img.fit {
-    max-width: min(100%, calc(100vw - 36px));
-    max-height: min(100%, calc(66vh - 24px));
+    max-width: 100%;
+    max-height: 100%;
   }
 
   .viewer-info {

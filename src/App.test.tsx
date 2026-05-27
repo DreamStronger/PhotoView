@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
 import App from "./App";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -9,8 +10,15 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(),
+  listen: vi.fn(() => Promise.resolve(() => undefined)),
 }));
+
+const invokeMock = vi.mocked(invoke);
+
+afterEach(() => {
+  Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
+  invokeMock.mockReset();
+});
 
 describe("App", () => {
   it("renders the empty collection workspace", () => {
@@ -86,4 +94,85 @@ describe("App", () => {
 
     expect(screen.getByText("请在桌面应用中搜索")).toBeInTheDocument();
   });
+
+  it("keeps tag assignment stable when clicking a dropdown tag", async () => {
+    const user = userEvent.setup();
+    Reflect.set(window, "__TAURI_INTERNALS__", {});
+    invokeMock.mockImplementation((command) => {
+      if (command === "get_app_status") {
+        return Promise.resolve(mockStatus(1, 0));
+      }
+      if (command === "list_collections") {
+        return Promise.resolve([mockCollection()]);
+      }
+      if (command === "list_tags") {
+        return Promise.resolve([mockTag()]);
+      }
+      if (command === "list_collection_tag_assignments") {
+        return Promise.resolve([]);
+      }
+      if (command === "get_settings") {
+        return Promise.resolve([]);
+      }
+
+      return Promise.resolve(null);
+    });
+
+    render(<App />);
+
+    await screen.findByText("测试合集");
+    fireEvent.click(screen.getByRole("button", { name: "设置合集标签" }));
+    const form = screen.getByRole("form", { name: "设置标签" });
+    await user.click(within(form).getByRole("button", { name: "设置标签" }));
+    await user.click(within(form).getByLabelText("风景"));
+
+    expect(within(form).getByLabelText("风景")).toBeChecked();
+    expect(within(form).getAllByText("风景").length).toBeGreaterThan(1);
+  });
 });
+
+function mockStatus(collectionCount: number, imageCount: number) {
+  return {
+    product_name: "PhotoView",
+    version: "0.1.3",
+    paths: {
+      app_data_dir: "",
+      database_path: "",
+      thumbnails_dir: "",
+    },
+    schema_version: 1,
+    current_schema_version: 1,
+    collection_count: collectionCount,
+    image_count: imageCount,
+    tag_count: 1,
+  };
+}
+
+function mockCollection() {
+  return {
+    id: "collection-1",
+    path: "/tmp/photos",
+    name: "测试合集",
+    coverImageId: null,
+    description: "",
+    rating: 0,
+    isFavorite: false,
+    imageCount: 0,
+    totalSizeBytes: 0,
+    createdAt: "2026-05-27T00:00:00Z",
+    importedAt: "2026-05-27T00:00:00Z",
+    updatedAt: "2026-05-27T00:00:00Z",
+    lastViewedAt: null,
+    viewCount: 0,
+  };
+}
+
+function mockTag() {
+  return {
+    id: "tag-1",
+    name: "风景",
+    color: "#4f7cff",
+    createdAt: "2026-05-27T00:00:00Z",
+    updatedAt: "2026-05-27T00:00:00Z",
+  };
+}
