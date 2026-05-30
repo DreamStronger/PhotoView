@@ -82,6 +82,7 @@ button {
 .app-shell[data-theme="dark"] .tag-assignment-trigger,
 .app-shell[data-theme="dark"] .tag-assignment-preview,
 .app-shell[data-theme="dark"] .tag-assignment-menu,
+.app-shell[data-theme="dark"] .language-segmented,
 .app-shell[data-theme="dark"] .image-tile,
 .app-shell[data-theme="dark"] .collection-editor,
 .app-shell[data-theme="dark"] .tag-assignment-modal {
@@ -91,15 +92,23 @@ button {
 }
 
 .app-shell[data-theme="dark"] .tag-assignment-menu label:hover,
+.app-shell[data-theme="dark"] .language-segmented button:hover,
+.app-shell[data-theme="dark"] .language-segmented button.active,
 .app-shell[data-theme="dark"] .image-tile[role="button"]:hover,
 .app-shell[data-theme="dark"] .image-tile[role="button"]:focus-visible {
   background: #243244;
 }
 
 .app-shell[data-theme="dark"] .tag-editor-panel label,
+.app-shell[data-theme="dark"] .settings-grid .setting-field,
+.app-shell[data-theme="dark"] .language-segmented button,
 .app-shell[data-theme="dark"] .tag-assignment-field,
 .app-shell[data-theme="dark"] .image-tile strong {
   color: #eef3f8;
+}
+
+.app-shell[data-theme="dark"] .language-segmented button + button {
+  border-left-color: #405164;
 }
 
 .app-shell[data-theme="dark"] .tag-assignment-preview small {
@@ -190,6 +199,11 @@ button {
 .nav-item.active small {
   background: #dbeafe;
   color: var(--accent-strong);
+}
+
+.language-nav-button small {
+  min-width: 30px;
+  padding: 0 6px;
 }
 
 .workspace {
@@ -326,6 +340,7 @@ button {
 }
 
 .settings-grid label,
+.settings-grid .setting-field,
 .settings-card label {
   display: grid;
   gap: 6px;
@@ -391,6 +406,35 @@ button {
 .settings-actions button:hover {
   border-color: #8fa1b8;
   background: #eef3f8;
+}
+
+.language-segmented {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.language-segmented button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #344054;
+  padding: 7px 8px;
+  font-weight: 650;
+}
+
+.language-segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.language-segmented button.active,
+.language-segmented button:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .range-inputs {
@@ -1343,6 +1387,7 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   border-radius: 7px;
   min-height: 38px;
   padding: 8px 14px;
@@ -1787,7 +1832,7 @@ button {
   }
 
   .brand {
-    padding: 0 48px 0 4px;
+    padding: 0 96px 0 4px;
   }
 
   .brand-mark {
@@ -1805,8 +1850,9 @@ button {
     position: absolute;
     top: 10px;
     right: 12px;
+    grid-template-columns: repeat(2, 40px);
     margin-top: 0;
-    width: 40px;
+    width: 86px;
   }
 
   .utility-nav .nav-item {

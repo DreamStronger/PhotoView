@@ -40,7 +40,31 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: "筛选" }));
     expect(screen.getByLabelText("高级搜索")).toBeInTheDocument();
-    expect(screen.getByLabelText("搜索格式")).toBeInTheDocument();
+    expect(screen.getByLabelText("格式")).toBeInTheDocument();
+  });
+
+  it("switches the visible interface language", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "切换到英文" }));
+
+    expect(screen.getByRole("heading", { name: "All collections" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Search" })).toHaveAttribute(
+      "placeholder",
+      "Search collections, paths, or descriptions",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Chinese" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByRole("button", { name: "English" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("switches sidebar navigation views", async () => {

@@ -2,9 +2,9 @@
 
 ## Current
 
-- 阶段：阶段 6，性能、功能问题修复。
-- 正在做：最新 `development` TODO 修复已通过 QA subagent 复审，准备提交、push、merge 和发布 `v0.1.3`。
-- 下一步：提交并 push `development`，合并到 `master`，推送 `v0.1.3` tag。
+- 阶段：阶段 6 后，国际化发布准备。
+- 正在做：准备提交双语支持并发布 `v2.0.1`。
+- 下一步：推送 `development`、合并到 `master`，再打 `v2.0.1` 标签触发 GitHub Release。
 
 ## Done
 
@@ -96,6 +96,19 @@
 - 已 bump 版本到 `0.1.3`：`package.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock`、`src-tauri/tauri.conf.json`。
 - 已完成本轮验证：`pnpm test` 10 项通过，`pnpm build` 通过，`cargo fmt --check` 通过，`cargo test` 26 项通过、1 项忽略，`cargo test fixture_acceptance_core_flow -- --ignored` 通过，`pnpm tauri build --debug --bundles app` 通过；Playwright 冒烟通过，桌面/移动无横向溢出、无 console/page error，测试浏览器和 dev server 已关闭。
 - QA subagent 复审结论：无高/中优先级问题；低风险为合集仍是前端分批渲染而非后端分页、竖图修复主要依赖 CSS 和 Playwright 冒烟。
+- 已新增 `docs/LAUNCH_FIRST_USERS.md`，包含首批用户招募落地页文案、中文/英文发帖模板、私信模板、反馈表问题、7 天推广步骤、指标和 FAQ。
+- 已新增 `landing/index.html` 和 `landing/README.md`，提供可直接打开的 PhotoView 静态落地页，CTA 当前指向 GitHub Release、Issues 和仓库首页。
+- 已完成落地页本地预览：桌面 1440x960、窄屏 390x844 均无横向溢出，图片资源全部加载成功。
+- 已按产品边界移除落地页中的移动端软件截图引用，窄屏网页预览改用桌面应用截图背景。
+- 已调整落地页真实截图展示比例：清除 `figure` 默认外边距，截图区统一为 16:10 桌面窗口比例，首屏背景截图尺寸改为更接近桌面软件预览。
+- 已修复落地页截图区左侧卡片底部空白：截图 grid 改为顶部对齐，避免左侧主截图卡片被右侧双截图列强行拉高。
+- 已新增 Reddit 可用的英文落地页 `landing/en.html`，中文页增加 `English` 切换入口，英文页可切回中文页。
+- 已将英文落地页截图替换为英文界面截图：`visual-language-en-home.png`、`visual-language-en-filters.png`、`visual-language-en-settings.png`。
+- 已修复 Windows/macOS 导入无响应问题：`choose_import_folder` 和 `import_folder` 改为 async command，`import_folder` 主体通过 `spawn_blocking` 进入阻塞线程池；导入改为按目录扫描后立即入库，不再把全部 `ScanReport` 堆入 `pending_imports`；目录发现进度事件做基础节流；进度条统一显示目录处理进度和已生成合集数。
+- 已完成本轮验证：`cargo fmt --check` 通过，`pnpm build` 通过，`cargo test` 26 项通过、1 项忽略，`pnpm test` 10 项通过，`pnpm tauri build --debug --bundles app` 通过。
+- 已完成主应用中英文切换：新增语言翻译表、侧栏快捷切换按钮、设置页中/英分段按钮，覆盖主界面、设置、搜索/筛选、标签、查看器、提示、确认弹窗和无障碍标签。
+- 已完成本轮验证：`pnpm test` 11 项通过，`pnpm build` 通过；Playwright 已保存中英文桌面/设置/筛选/标签/移动端截图，无 console/page error；视觉 subagent 最终复审“无意见”。
+- 已完成国际化 QA 收口：QA subagent 提出的低风险问题（筛选 min/max 占位符未本地化、侧栏导航 aria 固定英文）已修复；复测 `pnpm test`、`pnpm build`、`cargo fmt --check`、`cargo test`、`cargo test fixture_acceptance_core_flow -- --ignored`、`pnpm tauri build --debug --bundles app` 均通过；浏览器复测中英文筛选占位符、导航 aria、桌面/移动横向溢出和 console error 均正常；QA subagent 最终复审“无问题”。
 
 ## Blocked
 

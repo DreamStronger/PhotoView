@@ -23,6 +23,7 @@ import {
   Images,
   ImagePlus,
   Info,
+  Languages,
   List,
   Maximize2,
   MoveRight,
@@ -214,6 +215,8 @@ type ViewerImageAsset = {
 
 type ViewerFitMode = "fit" | "actual";
 type ImageLoadState = "loading" | "loaded" | "error";
+type AppLanguage = "zh-CN" | "en-US";
+type TranslationParams = Record<string, number | string>;
 
 type ImageContextMenu = {
   imageId: string;
@@ -228,6 +231,452 @@ type TagAssignmentTarget =
 
 const SEARCH_FORMATS = ["jpg", "png", "gif", "webp", "avif", "svg", "bmp", "tiff", "ico"];
 const COLLECTION_BATCH_SIZE = 80;
+const DEFAULT_LANGUAGE: AppLanguage = "zh-CN";
+
+const UI_TEXT = {
+  navAll: { "zh-CN": "全部", "en-US": "All" },
+  navFavorites: { "zh-CN": "收藏", "en-US": "Favorites" },
+  navRecent: { "zh-CN": "最近", "en-US": "Recent" },
+  navTags: { "zh-CN": "标签", "en-US": "Tags" },
+  navSettings: { "zh-CN": "设置", "en-US": "Settings" },
+  languageToggle: { "zh-CN": "语言", "en-US": "Language" },
+  switchToEnglish: { "zh-CN": "切换到英文", "en-US": "Switch to English" },
+  switchToChinese: { "zh-CN": "切换到中文", "en-US": "Switch to Chinese" },
+  search: { "zh-CN": "搜索", "en-US": "Search" },
+  searching: { "zh-CN": "搜索中", "en-US": "Searching" },
+  searchPlaceholder: {
+    "zh-CN": "搜索合集、路径或描述",
+    "en-US": "Search collections, paths, or descriptions",
+  },
+  navigation: { "zh-CN": "PhotoView 导航", "en-US": "PhotoView navigation" },
+  filter: { "zh-CN": "筛选", "en-US": "Filter" },
+  duplicateDetection: { "zh-CN": "重复检测", "en-US": "Duplicates" },
+  duplicateDetecting: { "zh-CN": "重复检测中", "en-US": "Checking duplicates" },
+  detecting: { "zh-CN": "检测中", "en-US": "Checking" },
+  duplicateShort: { "zh-CN": "重复", "en-US": "Dupes" },
+  syncLibrary: { "zh-CN": "同步图库", "en-US": "Sync library" },
+  syncing: { "zh-CN": "同步中", "en-US": "Syncing" },
+  syncShort: { "zh-CN": "同步", "en-US": "Sync" },
+  importFolder: { "zh-CN": "导入文件夹", "en-US": "Import folder" },
+  importAction: { "zh-CN": "导入", "en-US": "Import" },
+  cancelImport: { "zh-CN": "取消导入", "en-US": "Cancel import" },
+  cancel: { "zh-CN": "取消", "en-US": "Cancel" },
+  importing: { "zh-CN": "导入中", "en-US": "Importing" },
+  advancedSearch: { "zh-CN": "高级搜索", "en-US": "Advanced search" },
+  format: { "zh-CN": "格式", "en-US": "Format" },
+  tagsLabel: { "zh-CN": "标签", "en-US": "Tags" },
+  width: { "zh-CN": "宽度", "en-US": "Width" },
+  minWidth: { "zh-CN": "最小宽度", "en-US": "Minimum width" },
+  maxWidth: { "zh-CN": "最大宽度", "en-US": "Maximum width" },
+  minPlaceholder: { "zh-CN": "最小", "en-US": "min" },
+  maxPlaceholder: { "zh-CN": "最大", "en-US": "max" },
+  height: { "zh-CN": "高度", "en-US": "Height" },
+  dimensions: { "zh-CN": "尺寸", "en-US": "Dimensions" },
+  minHeight: { "zh-CN": "最小高度", "en-US": "Minimum height" },
+  maxHeight: { "zh-CN": "最大高度", "en-US": "Maximum height" },
+  sizeMb: { "zh-CN": "大小 MB", "en-US": "Size MB" },
+  minSize: { "zh-CN": "最小大小", "en-US": "Minimum size" },
+  maxSize: { "zh-CN": "最大大小", "en-US": "Maximum size" },
+  rating: { "zh-CN": "评分", "en-US": "Rating" },
+  minRating: { "zh-CN": "最低评分", "en-US": "Minimum rating" },
+  maxRating: { "zh-CN": "最高评分", "en-US": "Maximum rating" },
+  date: { "zh-CN": "日期", "en-US": "Date" },
+  startDate: { "zh-CN": "开始日期", "en-US": "Start date" },
+  endDate: { "zh-CN": "结束日期", "en-US": "End date" },
+  favorite: { "zh-CN": "收藏", "en-US": "Favorite" },
+  favoriteState: { "zh-CN": "收藏状态", "en-US": "Favorite status" },
+  any: { "zh-CN": "不限", "en-US": "Any" },
+  favorited: { "zh-CN": "已收藏", "en-US": "Favorited" },
+  notFavorited: { "zh-CN": "未收藏", "en-US": "Not favorited" },
+  applyFilters: { "zh-CN": "应用筛选", "en-US": "Apply" },
+  reset: { "zh-CN": "重置", "en-US": "Reset" },
+  searchResults: { "zh-CN": "搜索结果", "en-US": "Search results" },
+  closeSearchResults: { "zh-CN": "关闭搜索结果", "en-US": "Close search results" },
+  collections: { "zh-CN": "合集", "en-US": "Collections" },
+  images: { "zh-CN": "图片", "en-US": "Images" },
+  noCollections: { "zh-CN": "无合集", "en-US": "No collections" },
+  noImages: { "zh-CN": "无图片", "en-US": "No images" },
+  noTags: { "zh-CN": "无标签", "en-US": "No tags" },
+  duplicateResults: { "zh-CN": "重复检测结果", "en-US": "Duplicate results" },
+  closeDuplicateResults: {
+    "zh-CN": "关闭重复检测结果",
+    "en-US": "Close duplicate results",
+  },
+  duplicateSummary: {
+    "zh-CN": "重复检测：{hashed}/{scanned} 张",
+    "en-US": "Duplicates: {hashed}/{scanned} images",
+  },
+  noDuplicateImages: { "zh-CN": "未发现重复图片", "en-US": "No duplicate images found" },
+  backToCollections: { "zh-CN": "返回合集", "en-US": "Back to collections" },
+  favoriteCollection: { "zh-CN": "收藏合集", "en-US": "Favorite collection" },
+  unfavoriteCollection: { "zh-CN": "取消收藏合集", "en-US": "Unfavorite collection" },
+  setCollectionTags: { "zh-CN": "设置合集标签", "en-US": "Set collection tags" },
+  editCollection: { "zh-CN": "编辑合集", "en-US": "Edit collection" },
+  deleteCollectionRecord: {
+    "zh-CN": "删除合集记录",
+    "en-US": "Delete collection record",
+  },
+  openLocation: { "zh-CN": "打开所在位置", "en-US": "Open location" },
+  allTags: { "zh-CN": "全部标签", "en-US": "All tags" },
+  imageTagFilter: { "zh-CN": "图片标签筛选", "en-US": "Image tag filter" },
+  imageView: { "zh-CN": "图片视图", "en-US": "Image view" },
+  imageListView: { "zh-CN": "图片列表视图", "en-US": "Image list view" },
+  imageGridView: { "zh-CN": "图片网格视图", "en-US": "Image grid view" },
+  listView: { "zh-CN": "列表视图", "en-US": "List view" },
+  gridView: { "zh-CN": "网格视图", "en-US": "Grid view" },
+  collectionTags: { "zh-CN": "合集标签", "en-US": "Collection tags" },
+  batchImageActions: { "zh-CN": "批量图片操作", "en-US": "Batch image actions" },
+  selectedImageCount: { "zh-CN": "已选 {count} 张", "en-US": "{count} selected" },
+  move: { "zh-CN": "移动", "en-US": "Move" },
+  copy: { "zh-CN": "复制", "en-US": "Copy" },
+  tag: { "zh-CN": "标签", "en-US": "Tags" },
+  delete: { "zh-CN": "删除", "en-US": "Delete" },
+  clear: { "zh-CN": "清空", "en-US": "Clear" },
+  imageMoveTargets: { "zh-CN": "图片移动目标", "en-US": "Image move targets" },
+  moveToCollection: { "zh-CN": "移动到 {name}", "en-US": "Move to {name}" },
+  collectionImageCount: { "zh-CN": "{count} 张", "en-US": "{count} images" },
+  loading: { "zh-CN": "加载中", "en-US": "Loading" },
+  readingImageIndex: { "zh-CN": "正在读取图片索引。", "en-US": "Reading image index." },
+  selectImage: { "zh-CN": "选择图片", "en-US": "Select image" },
+  imageTags: { "zh-CN": "图片标签", "en-US": "Image tags" },
+  setImageTags: { "zh-CN": "设置图片标签", "en-US": "Set image tags" },
+  setAsCover: { "zh-CN": "设为封面", "en-US": "Set as cover" },
+  renameImage: { "zh-CN": "重命名图片", "en-US": "Rename image" },
+  moveImage: { "zh-CN": "移动图片", "en-US": "Move image" },
+  copyImage: { "zh-CN": "复制图片", "en-US": "Copy image" },
+  deleteImage: { "zh-CN": "删除图片", "en-US": "Delete image" },
+  unknownDimensions: { "zh-CN": "尺寸未知", "en-US": "Unknown dimensions" },
+  noMatchingImages: { "zh-CN": "没有匹配图片", "en-US": "No matching images" },
+  noImagesYet: { "zh-CN": "暂无图片", "en-US": "No images yet" },
+  adjustTagFilter: { "zh-CN": "调整标签筛选后再试。", "en-US": "Adjust the tag filter and try again." },
+  reimportCheckPermissions: {
+    "zh-CN": "重新导入或检查文件夹权限后再试。",
+    "en-US": "Re-import or check folder permissions, then try again.",
+  },
+  settings: { "zh-CN": "设置", "en-US": "Settings" },
+  settingsSubtitle: {
+    "zh-CN": "偏好与本地数据管理",
+    "en-US": "Preferences and local data management",
+  },
+  preferences: { "zh-CN": "偏好", "en-US": "Preferences" },
+  theme: { "zh-CN": "主题", "en-US": "Theme" },
+  system: { "zh-CN": "系统", "en-US": "System" },
+  light: { "zh-CN": "浅色", "en-US": "Light" },
+  dark: { "zh-CN": "深色", "en-US": "Dark" },
+  language: { "zh-CN": "语言", "en-US": "Language" },
+  languageChinese: { "zh-CN": "简体中文", "en-US": "Chinese" },
+  languageEnglish: { "zh-CN": "English", "en-US": "English" },
+  shortcuts: { "zh-CN": "快捷键", "en-US": "Shortcuts" },
+  defaultShortcut: { "zh-CN": "默认", "en-US": "Default" },
+  minimalShortcut: { "zh-CN": "精简", "en-US": "Minimal" },
+  thumbnails: { "zh-CN": "缩略图", "en-US": "Thumbnails" },
+  savePreferences: { "zh-CN": "保存偏好", "en-US": "Save preferences" },
+  dataManagement: { "zh-CN": "数据管理", "en-US": "Data management" },
+  backupDatabase: { "zh-CN": "备份数据库", "en-US": "Back up database" },
+  restoreDatabase: { "zh-CN": "恢复数据库", "en-US": "Restore database" },
+  rebuildIndex: { "zh-CN": "重建索引", "en-US": "Rebuild index" },
+  exportData: { "zh-CN": "导出数据", "en-US": "Export data" },
+  tagCount: { "zh-CN": "{count} 个标签", "en-US": "{count} tags" },
+  editTag: { "zh-CN": "编辑标签", "en-US": "Edit tag" },
+  newTag: { "zh-CN": "新建标签", "en-US": "New tag" },
+  tagName: { "zh-CN": "标签名称", "en-US": "Tag name" },
+  color: { "zh-CN": "颜色", "en-US": "Color" },
+  tagColor: { "zh-CN": "标签颜色", "en-US": "Tag color" },
+  cancelEdit: { "zh-CN": "取消编辑", "en-US": "Cancel editing" },
+  saving: { "zh-CN": "保存中", "en-US": "Saving" },
+  saveTag: { "zh-CN": "保存标签", "en-US": "Save tag" },
+  addTag: { "zh-CN": "添加标签", "en-US": "Add tag" },
+  noTagsYet: { "zh-CN": "暂无标签", "en-US": "No tags yet" },
+  collectionSort: { "zh-CN": "合集排序", "en-US": "Collection sort" },
+  recentImport: { "zh-CN": "最近导入", "en-US": "Recent import" },
+  name: { "zh-CN": "名称", "en-US": "Name" },
+  imageCount: { "zh-CN": "图片数量", "en-US": "Image count" },
+  storageSize: { "zh-CN": "占用空间", "en-US": "Storage size" },
+  tagFilter: { "zh-CN": "标签筛选", "en-US": "Tag filter" },
+  collectionView: { "zh-CN": "合集视图", "en-US": "Collection view" },
+  initializing: { "zh-CN": "初始化中", "en-US": "Initializing" },
+  readingCollectionIndex: {
+    "zh-CN": "正在读取本地合集索引。",
+    "en-US": "Reading the local collection index.",
+  },
+  copiedPath: { "zh-CN": "复制路径", "en-US": "Copy path" },
+  loadMoreCollections: { "zh-CN": "加载更多合集", "en-US": "Load more collections" },
+  noMatchingCollections: { "zh-CN": "没有匹配合集", "en-US": "No matching collections" },
+  noCollectionsYet: { "zh-CN": "暂无合集", "en-US": "No collections yet" },
+  adjustSearchKeywords: {
+    "zh-CN": "调整搜索关键词后再试。",
+    "en-US": "Adjust the search keywords and try again.",
+  },
+  importFolderEmptyDescription: {
+    "zh-CN": "选择本地图片文件夹后，PhotoView 会在本机建立索引。",
+    "en-US": "Choose a local image folder and PhotoView will index it on this device.",
+  },
+  selectedImportFolder: {
+    "zh-CN": "已选择的导入文件夹",
+    "en-US": "Selected import folder",
+  },
+  importProgress: { "zh-CN": "导入进度", "en-US": "Import progress" },
+  generatedCollections: {
+    "zh-CN": "已生成 {count} 个合集",
+    "en-US": "{count} collections generated",
+  },
+  importingDatabase: { "zh-CN": "正在初始化数据库", "en-US": "Initializing database" },
+  statusImageCount: { "zh-CN": "{count} 张图片", "en-US": "{count} images" },
+  statusTagCount: { "zh-CN": "{count} 个标签", "en-US": "{count} tags" },
+  open: { "zh-CN": "打开", "en-US": "Open" },
+  rename: { "zh-CN": "重命名", "en-US": "Rename" },
+  info: { "zh-CN": "信息", "en-US": "Info" },
+  closeEdit: { "zh-CN": "关闭编辑", "en-US": "Close editor" },
+  description: { "zh-CN": "描述", "en-US": "Description" },
+  save: { "zh-CN": "保存", "en-US": "Save" },
+  setTags: { "zh-CN": "设置标签", "en-US": "Set tags" },
+  closeTagSettings: { "zh-CN": "关闭标签设置", "en-US": "Close tag settings" },
+  tagOptions: { "zh-CN": "标签选项", "en-US": "Tag options" },
+  selectedTags: { "zh-CN": "已选标签", "en-US": "Selected tags" },
+  selectedTagsCount: { "zh-CN": "已选择 {count} 个标签", "en-US": "{count} tags selected" },
+  selectTags: { "zh-CN": "选择标签", "en-US": "Select tags" },
+  noTagsSelected: { "zh-CN": "未选择标签", "en-US": "No tags selected" },
+  imageViewer: { "zh-CN": "图片查看器", "en-US": "Image viewer" },
+  viewerToolbar: { "zh-CN": "查看器工具栏", "en-US": "Viewer toolbar" },
+  fit: { "zh-CN": "适应", "en-US": "Fit" },
+  zoomOut: { "zh-CN": "缩小", "en-US": "Zoom out" },
+  zoomIn: { "zh-CN": "放大", "en-US": "Zoom in" },
+  rotate90: { "zh-CN": "旋转 90 度", "en-US": "Rotate 90 degrees" },
+  fullscreen: { "zh-CN": "全屏", "en-US": "Fullscreen" },
+  pauseSlideshow: { "zh-CN": "暂停幻灯片", "en-US": "Pause slideshow" },
+  startSlideshow: { "zh-CN": "开始幻灯片", "en-US": "Start slideshow" },
+  imageInfo: { "zh-CN": "图片信息", "en-US": "Image info" },
+  closeViewer: { "zh-CN": "关闭查看器", "en-US": "Close viewer" },
+  previousImage: { "zh-CN": "上一张", "en-US": "Previous image" },
+  nextImage: { "zh-CN": "下一张", "en-US": "Next image" },
+  loadingImage: { "zh-CN": "正在加载图片", "en-US": "Loading image" },
+  imageDecodeFailed: { "zh-CN": "图片解码失败", "en-US": "Image decode failed" },
+  unknown: { "zh-CN": "未知", "en-US": "Unknown" },
+  path: { "zh-CN": "路径", "en-US": "Path" },
+  exactDuplicate: { "zh-CN": "完全重复", "en-US": "Exact duplicate" },
+  similarDuplicate: { "zh-CN": "相似 {score}", "en-US": "Similar {score}" },
+  deleteRest: { "zh-CN": "删除其余", "en-US": "Delete rest" },
+  keep: { "zh-CN": "保留", "en-US": "Keep" },
+  candidate: { "zh-CN": "候选", "en-US": "Candidate" },
+  tagFilterTitle: { "zh-CN": "标签：{name}", "en-US": "Tag: {name}" },
+  tagFilterFallback: { "zh-CN": "标签筛选", "en-US": "Tag filter" },
+  favoritesCollections: { "zh-CN": "收藏合集", "en-US": "Favorite collections" },
+  recentViewed: { "zh-CN": "最近浏览", "en-US": "Recently viewed" },
+  allCollections: { "zh-CN": "全部合集", "en-US": "All collections" },
+  importDone: { "zh-CN": "导入完成", "en-US": "Import complete" },
+  imported: { "zh-CN": "已导入", "en-US": "Imported" },
+  skipped: { "zh-CN": "已跳过", "en-US": "Skipped" },
+  preparingImport: { "zh-CN": "准备导入", "en-US": "Preparing import" },
+  scanning: { "zh-CN": "正在扫描", "en-US": "Scanning" },
+  directories: { "zh-CN": "目录", "en-US": "folders" },
+  collectionRating: { "zh-CN": "评分 {rating}/5", "en-US": "Rating {rating}/5" },
+  collectionCountStatus: {
+    "zh-CN": "{rendered}/{visible}/{total} 个合集",
+    "en-US": "{rendered}/{visible}/{total} collections",
+  },
+  folderSynced: { "zh-CN": "文件夹变更已同步", "en-US": "Folder changes synced" },
+  importCompletedNotice: {
+    "zh-CN": "导入 {collections} 个合集：扫描 {scanned} 张，新增 {inserted} 张，更新 {updated} 张，错误 {errors} 个",
+    "en-US": "Imported {collections} collections: scanned {scanned}, added {inserted}, updated {updated}, errors {errors}",
+  },
+  importProgressNotice: {
+    "zh-CN": "{action} {name}，目录 {processed}/{total}，生成 {collections} 个合集",
+    "en-US": "{action} {name}, folders {processed}/{total}, {collections} collections generated",
+  },
+  locatedImage: { "zh-CN": "已定位图片", "en-US": "Image located" },
+  desktopImportFolder: {
+    "zh-CN": "请在桌面应用中导入文件夹",
+    "en-US": "Import folders in the desktop app",
+  },
+  importingFolder: { "zh-CN": "正在导入文件夹", "en-US": "Importing folder" },
+  importCancelledRefreshed: {
+    "zh-CN": "导入已取消，已刷新已导入合集",
+    "en-US": "Import canceled; imported collections refreshed",
+  },
+  cancellingImport: { "zh-CN": "正在取消导入", "en-US": "Canceling import" },
+  desktopSyncFolder: {
+    "zh-CN": "请在桌面应用中同步文件夹",
+    "en-US": "Sync folders in the desktop app",
+  },
+  foldersSynced: { "zh-CN": "文件夹已同步", "en-US": "Folders synced" },
+  desktopSaveSettings: {
+    "zh-CN": "请在桌面应用中保存设置",
+    "en-US": "Save settings in the desktop app",
+  },
+  settingsSaved: { "zh-CN": "设置已保存", "en-US": "Settings saved" },
+  languageSaved: { "zh-CN": "语言已切换为中文", "en-US": "Language switched to English" },
+  desktopDataTools: {
+    "zh-CN": "请在桌面应用中使用数据工具",
+    "en-US": "Use data tools in the desktop app",
+  },
+  backupPathPrompt: { "zh-CN": "备份数据库路径", "en-US": "Backup database path" },
+  restoreOverwriteConfirm: {
+    "zh-CN": "恢复会覆盖当前数据库，继续？",
+    "en-US": "Restore will overwrite the current database. Continue?",
+  },
+  desktopRestoreDatabase: {
+    "zh-CN": "请在桌面应用中恢复数据库",
+    "en-US": "Restore the database in the desktop app",
+  },
+  desktopCopyPath: {
+    "zh-CN": "请在桌面应用中复制路径",
+    "en-US": "Copy paths in the desktop app",
+  },
+  pathCopied: { "zh-CN": "路径已复制", "en-US": "Path copied" },
+  desktopOpenLocation: {
+    "zh-CN": "请在桌面应用中打开位置",
+    "en-US": "Open locations in the desktop app",
+  },
+  desktopSearch: { "zh-CN": "请在桌面应用中搜索", "en-US": "Search in the desktop app" },
+  searchCompletedNotice: {
+    "zh-CN": "搜索完成：{collections} 个合集，{images} 张图片，{tags} 个标签",
+    "en-US": "Search complete: {collections} collections, {images} images, {tags} tags",
+  },
+  filtersCleared: { "zh-CN": "筛选条件已清空", "en-US": "Filters cleared" },
+  filteredTag: { "zh-CN": "已筛选标签：{name}", "en-US": "Filtered by tag: {name}" },
+  desktopDuplicateDetection: {
+    "zh-CN": "请在桌面应用中检测重复图片",
+    "en-US": "Check duplicates in the desktop app",
+  },
+  duplicateCompletedNotice: {
+    "zh-CN": "检测完成：扫描 {scanned} 张，完全重复 {exact} 组，相似 {similar} 组",
+    "en-US": "Check complete: scanned {scanned}, exact {exact} groups, similar {similar} groups",
+  },
+  deleteDuplicateConfirm: {
+    "zh-CN": "保留第一张，删除其余 {count} 张到回收站？",
+    "en-US": "Keep the first image and move the other {count} to trash?",
+  },
+  deletedDuplicateImages: {
+    "zh-CN": "已删除 {count} 张重复图片",
+    "en-US": "Deleted {count} duplicate images",
+  },
+  desktopEditCollection: {
+    "zh-CN": "请在桌面应用中编辑合集",
+    "en-US": "Edit collections in the desktop app",
+  },
+  collectionSaved: { "zh-CN": "合集已保存", "en-US": "Collection saved" },
+  desktopFavoriteCollection: {
+    "zh-CN": "请在桌面应用中收藏合集",
+    "en-US": "Favorite collections in the desktop app",
+  },
+  favoritedCollection: { "zh-CN": "已收藏合集", "en-US": "Collection favorited" },
+  unfavoritedCollection: { "zh-CN": "已取消收藏", "en-US": "Collection unfavorited" },
+  desktopSetCover: {
+    "zh-CN": "请在桌面应用中设置封面",
+    "en-US": "Set covers in the desktop app",
+  },
+  coverUpdated: { "zh-CN": "封面已更新", "en-US": "Cover updated" },
+  desktopSaveTag: { "zh-CN": "请在桌面应用中保存标签", "en-US": "Save tags in the desktop app" },
+  tagSaved: { "zh-CN": "标签已保存", "en-US": "Tag saved" },
+  tagCreated: { "zh-CN": "标签已创建", "en-US": "Tag created" },
+  deleteTagConfirm: {
+    "zh-CN": "删除标签“{name}”？关联会一并移除。",
+    "en-US": "Delete tag \"{name}\"? Related assignments will also be removed.",
+  },
+  desktopDeleteTag: { "zh-CN": "请在桌面应用中删除标签", "en-US": "Delete tags in the desktop app" },
+  tagDeleted: { "zh-CN": "标签已删除", "en-US": "Tag deleted" },
+  createTagFirst: { "zh-CN": "请先创建标签", "en-US": "Create a tag first" },
+  desktopSetTags: { "zh-CN": "请在桌面应用中设置标签", "en-US": "Set tags in the desktop app" },
+  collectionTagsUpdated: { "zh-CN": "合集标签已更新", "en-US": "Collection tags updated" },
+  imageTagsUpdated: { "zh-CN": "图片标签已更新", "en-US": "Image tags updated" },
+  batchTagsUpdated: {
+    "zh-CN": "已设置 {count} 张图片的标签",
+    "en-US": "Updated tags for {count} images",
+  },
+  newFileNamePrompt: { "zh-CN": "新的文件名", "en-US": "New file name" },
+  desktopRenameImage: {
+    "zh-CN": "请在桌面应用中重命名图片",
+    "en-US": "Rename images in the desktop app",
+  },
+  imageRenamed: { "zh-CN": "图片已重命名", "en-US": "Image renamed" },
+  deleteImageConfirm: {
+    "zh-CN": "删除图片“{name}”？默认移到系统回收站。",
+    "en-US": "Delete image \"{name}\"? It will be moved to system trash by default.",
+  },
+  desktopDeleteImage: {
+    "zh-CN": "请在桌面应用中删除图片",
+    "en-US": "Delete images in the desktop app",
+  },
+  imageMovedToTrash: { "zh-CN": "图片已移到回收站", "en-US": "Image moved to trash" },
+  noTargetCollections: { "zh-CN": "没有可用目标合集", "en-US": "No target collections available" },
+  moveToCollectionTitle: { "zh-CN": "移动到合集", "en-US": "Move to collection" },
+  copyToCollectionTitle: { "zh-CN": "复制到合集", "en-US": "Copy to collection" },
+  desktopMoveImage: { "zh-CN": "请在桌面应用中移动图片", "en-US": "Move images in the desktop app" },
+  movedImagesNotice: {
+    "zh-CN": "已移动 {count} 张到 {name}",
+    "en-US": "Moved {count} images to {name}",
+  },
+  desktopCopyImage: { "zh-CN": "请在桌面应用中复制图片", "en-US": "Copy images in the desktop app" },
+  copiedImagesNotice: {
+    "zh-CN": "已复制 {count} 张到 {name}",
+    "en-US": "Copied {count} images to {name}",
+  },
+  batchMoveToCollectionTitle: { "zh-CN": "批量移动到合集", "en-US": "Batch move to collection" },
+  batchCopyToCollectionTitle: { "zh-CN": "批量复制到合集", "en-US": "Batch copy to collection" },
+  batchDeleteConfirm: {
+    "zh-CN": "删除选中的 {count} 张图片？默认移到系统回收站。",
+    "en-US": "Delete the selected {count} images? They will be moved to system trash by default.",
+  },
+  desktopBatchDelete: {
+    "zh-CN": "请在桌面应用中批量删除图片",
+    "en-US": "Batch delete images in the desktop app",
+  },
+  deletedImagesNotice: { "zh-CN": "已删除 {count} 张图片", "en-US": "Deleted {count} images" },
+  ratingPrompt: { "zh-CN": "评分 0-5", "en-US": "Rating 0-5" },
+  ratingError: {
+    "zh-CN": "评分必须是 0 到 5 的整数",
+    "en-US": "Rating must be an integer from 0 to 5",
+  },
+  desktopBatchRating: {
+    "zh-CN": "请在桌面应用中批量评分",
+    "en-US": "Batch rate images in the desktop app",
+  },
+  ratedImagesNotice: {
+    "zh-CN": "已评分 {count} 张图片",
+    "en-US": "Rated {count} images",
+  },
+  deleteCollectionConfirm: {
+    "zh-CN": "删除合集记录“{name}”？磁盘文件夹不会被删除。",
+    "en-US": "Delete collection record \"{name}\"? The folder on disk will not be deleted.",
+  },
+  desktopDeleteCollectionRecord: {
+    "zh-CN": "请在桌面应用中删除合集记录",
+    "en-US": "Delete collection records in the desktop app",
+  },
+  collectionRecordDeleted: {
+    "zh-CN": "合集记录已删除，磁盘文件夹已保留",
+    "en-US": "Collection record deleted; disk folder kept",
+  },
+  backupCreated: { "zh-CN": "数据库备份已创建", "en-US": "Database backup created" },
+  databaseRestored: { "zh-CN": "数据库已从备份恢复", "en-US": "Database restored from backup" },
+  indexRebuilt: { "zh-CN": "索引已重建", "en-US": "Index rebuilt" },
+  libraryExported: { "zh-CN": "图库数据已导出", "en-US": "Library data exported" },
+} as const;
+
+type TranslationKey = keyof typeof UI_TEXT;
+type Translator = (key: TranslationKey, params?: TranslationParams) => string;
+const LANGUAGE_OPTIONS: { value: AppLanguage; labelKey: TranslationKey; shortLabel: string }[] = [
+  { value: "zh-CN", labelKey: "languageChinese", shortLabel: "中" },
+  { value: "en-US", labelKey: "languageEnglish", shortLabel: "EN" },
+];
+
+function normalizeLanguage(value: string | null | undefined): AppLanguage {
+  return value === "en-US" ? "en-US" : DEFAULT_LANGUAGE;
+}
+
+function translateText(
+  language: AppLanguage,
+  key: TranslationKey,
+  params: TranslationParams = {},
+): string {
+  return UI_TEXT[key][language].replace(/\{(\w+)\}/g, (match, name) =>
+    Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match,
+  );
+}
+
+function createTranslator(language: AppLanguage): Translator {
+  return (key, params) => translateText(language, key, params);
+}
 
 function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
@@ -262,7 +711,7 @@ function App() {
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [activeView, setActiveView] = useState<NavigationView>("all");
   const [theme, setTheme] = useState("system");
-  const [language, setLanguage] = useState("zh-CN");
+  const [language, setLanguage] = useState<AppLanguage>(DEFAULT_LANGUAGE);
   const [shortcutProfile, setShortcutProfile] = useState("default");
   const [thumbnailSize, setThumbnailSize] = useState("192");
   const [searchFormats, setSearchFormats] = useState<string[]>([]);
@@ -313,6 +762,9 @@ function App() {
   const pendingImageFocusId = useRef<string | null>(null);
   const imageListRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<HTMLDivElement | null>(null);
+  const appLanguage = normalizeLanguage(language);
+  const t = useMemo(() => createTranslator(appLanguage), [appLanguage]);
+  const alternateLanguage: AppLanguage = appLanguage === "zh-CN" ? "en-US" : "zh-CN";
 
   const selectedCollection = useMemo(
     () => collections.find((collection) => collection.id === selectedCollectionId) ?? null,
@@ -356,11 +808,11 @@ function App() {
       : null;
   const tagAssignmentTitle = tagAssignmentTarget
     ? tagAssignmentTarget.kind === "collection"
-      ? `合集标签：${tagAssignmentTarget.collection.name}`
+      ? t("tagFilterTitle", { name: tagAssignmentTarget.collection.name })
       : tagAssignmentTarget.kind === "image"
-        ? `图片标签：${tagAssignmentTarget.image.fileName}`
-        : `批量标签：${tagAssignmentTarget.images.length} 张图片`
-    : "设置标签";
+        ? `${t("imageTags")}: ${tagAssignmentTarget.image.fileName}`
+        : `${t("setTags")}: ${t("statusImageCount", { count: tagAssignmentTarget.images.length })}`
+    : t("setTags");
 
   const visibleCollections = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -398,8 +850,8 @@ function App() {
       });
     }
 
-    return [...filtered].sort((left, right) => compareCollections(left, right, sortKey));
-  }, [activeView, collectionTagMap, collections, query, selectedTagFilterId, sortKey]);
+    return [...filtered].sort((left, right) => compareCollections(left, right, sortKey, appLanguage));
+  }, [activeView, appLanguage, collectionTagMap, collections, query, selectedTagFilterId, sortKey]);
   const renderedCollections = useMemo(
     () => visibleCollections.slice(0, collectionRenderLimit),
     [collectionRenderLimit, visibleCollections],
@@ -550,7 +1002,7 @@ function App() {
       if (selectedCollectionId === event.payload) {
         void refreshImages(event.payload);
       }
-      setNotice("文件夹变更已同步");
+      setNotice(t("folderSynced"));
     }).then((value) => {
       unlistenSync = value;
     });
@@ -560,14 +1012,31 @@ function App() {
       setImportProgress(progress);
       if (progress.phase === "completed") {
         setNotice(
-          `导入 ${progress.collectionCount} 个合集：扫描 ${progress.scannedCount} 张，新增 ${progress.insertedCount} 张，更新 ${progress.updatedCount} 张，错误 ${progress.errorCount} 个`,
+          t("importCompletedNotice", {
+            collections: progress.collectionCount,
+            scanned: progress.scannedCount,
+            inserted: progress.insertedCount,
+            updated: progress.updatedCount,
+            errors: progress.errorCount,
+          }),
         );
         return;
       }
 
-      const action = progress.phase === "imported" ? "已导入" : progress.phase === "skipped" ? "已跳过" : "正在扫描";
+      const action =
+        progress.phase === "imported"
+          ? t("imported")
+          : progress.phase === "skipped"
+            ? t("skipped")
+            : t("scanning");
       setNotice(
-        `${action} ${progress.currentName}，目录 ${progress.processedCount}/${progress.totalCount || "?"}，生成 ${progress.collectionCount} 个合集`,
+        t("importProgressNotice", {
+          action,
+          name: progress.currentName,
+          processed: progress.processedCount,
+          total: progress.totalCount || "?",
+          collections: progress.collectionCount,
+        }),
       );
     }).then((value) => {
       unlistenImportProgress = value;
@@ -578,7 +1047,7 @@ function App() {
       unlistenSync?.();
       unlistenImportProgress?.();
     };
-  }, [selectedCollectionId]);
+  }, [selectedCollectionId, t]);
 
   useEffect(() => {
     if (!activeImage) {
@@ -717,7 +1186,7 @@ function App() {
       const records = await invoke<SettingRecord[]>("get_settings");
       const nextSettings = Object.fromEntries(records.map((setting) => [setting.key, setting.value]));
       setTheme(settingValue(nextSettings.theme, "system"));
-      setLanguage(settingValue(nextSettings.language, "zh-CN"));
+      setLanguage(normalizeLanguage(settingValue(nextSettings.language, DEFAULT_LANGUAGE)));
       setShortcutProfile(settingValue(nextSettings.shortcut_profile, "default"));
       setThumbnailSize(settingValue(nextSettings.thumbnail_size, "192"));
     } catch (value) {
@@ -790,7 +1259,7 @@ function App() {
         pendingImageFocusId.current = null;
         if (nextImages.some((image) => image.id === pendingImageId)) {
           setSelectedImageIds(new Set([pendingImageId]));
-          setNotice("已定位图片");
+          setNotice(t("locatedImage"));
           window.setTimeout(() => {
             const index = nextImages.findIndex((image) => image.id === pendingImageId);
             if (index >= 0) {
@@ -872,7 +1341,7 @@ function App() {
     setIsImporting(true);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中导入文件夹");
+      setNotice(t("desktopImportFolder"));
       importInFlight.current = false;
       setIsImporting(false);
       return;
@@ -887,14 +1356,20 @@ function App() {
       }
 
       setSelectedImportPath(folder);
-      setNotice("正在导入文件夹");
+      setNotice(t("importingFolder"));
 
       const result = await invoke<ImportFolderResult>("import_folder", {
         request: { path: folder },
       });
 
       setNotice(
-        `导入 ${result.collectionCount} 个合集：扫描 ${result.scannedCount} 张，新增 ${result.insertedCount} 张，更新 ${result.updatedCount} 张，错误 ${result.errorCount} 个`,
+        t("importCompletedNotice", {
+          collections: result.collectionCount,
+          scanned: result.scannedCount,
+          inserted: result.insertedCount,
+          updated: result.updatedCount,
+          errors: result.errorCount,
+        }),
       );
       await refreshAppData();
       setActiveView("all");
@@ -907,7 +1382,7 @@ function App() {
         setActiveView("all");
         setSelectedCollectionId(null);
         setImportProgress(null);
-        setNotice("导入已取消，已刷新已导入合集");
+        setNotice(t("importCancelledRefreshed"));
         return;
       }
 
@@ -924,7 +1399,7 @@ function App() {
     }
 
     try {
-      setNotice("正在取消导入");
+      setNotice(t("cancellingImport"));
       await invoke("cancel_import");
     } catch (value) {
       setError(invokeErrorMessage(value));
@@ -937,7 +1412,7 @@ function App() {
     setIsSyncing(true);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中同步文件夹");
+      setNotice(t("desktopSyncFolder"));
       setIsSyncing(false);
       return;
     }
@@ -950,7 +1425,7 @@ function App() {
         await invoke("sync_all_collections");
       }
       await refreshAppData();
-      setNotice("文件夹已同步");
+      setNotice(t("foldersSynced"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     } finally {
@@ -963,7 +1438,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中保存设置");
+      setNotice(t("desktopSaveSettings"));
       return;
     }
 
@@ -974,7 +1449,28 @@ function App() {
         saveSetting("shortcut_profile", shortcutProfile),
         saveSetting("thumbnail_size", thumbnailSize),
       ]);
-      setNotice("设置已保存");
+      setNotice(t("settingsSaved"));
+    } catch (value) {
+      setError(invokeErrorMessage(value));
+    }
+  }
+
+  async function updateLanguagePreference(nextLanguage: AppLanguage) {
+    if (nextLanguage === appLanguage) {
+      return;
+    }
+
+    setLanguage(nextLanguage);
+    setError(null);
+
+    if (!isTauriRuntime()) {
+      setNotice(translateText(nextLanguage, "languageSaved"));
+      return;
+    }
+
+    try {
+      await saveSetting("language", nextLanguage);
+      setNotice(translateText(nextLanguage, "languageSaved"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
@@ -992,22 +1488,22 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中使用数据工具");
+      setNotice(t("desktopDataTools"));
       return;
     }
 
     try {
       const result = await invoke<DataFileResult>(command);
       await refreshAppData();
-      setNotice(result.path ? `${result.message}：${result.path}` : result.message);
+      setNotice(formatDataToolNotice(command, result, t));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
   }
 
   async function restoreDatabase() {
-    const path = window.prompt("备份数据库路径")?.trim();
-    if (!path || !window.confirm("恢复会覆盖当前数据库，继续？")) {
+    const path = window.prompt(t("backupPathPrompt"))?.trim();
+    if (!path || !window.confirm(t("restoreOverwriteConfirm"))) {
       return;
     }
 
@@ -1015,14 +1511,14 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中恢复数据库");
+      setNotice(t("desktopRestoreDatabase"));
       return;
     }
 
     try {
-      const result = await invoke<DataFileResult>("restore_database_from_backup", { path });
+      await invoke<DataFileResult>("restore_database_from_backup", { path });
       await refreshAppData();
-      setNotice(result.message);
+      setNotice(t("databaseRestored"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
@@ -1049,13 +1545,13 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中复制路径");
+      setNotice(t("desktopCopyPath"));
       return;
     }
 
     try {
       await invoke("copy_path_to_clipboard", { path });
-      setNotice("路径已复制");
+      setNotice(t("pathCopied"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
@@ -1066,7 +1562,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中打开位置");
+      setNotice(t("desktopOpenLocation"));
       return;
     }
 
@@ -1083,7 +1579,7 @@ function App() {
     setIsSearching(true);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中搜索");
+      setNotice(t("desktopSearch"));
       setIsSearching(false);
       return;
     }
@@ -1111,7 +1607,11 @@ function App() {
       });
       setSearchResults(results);
       setNotice(
-        `搜索完成：${results.collections.length} 个合集，${results.images.length} 张图片，${results.tags.length} 个标签`,
+        t("searchCompletedNotice", {
+          collections: results.collections.length,
+          images: results.images.length,
+          tags: results.tags.length,
+        }),
       );
     } catch (value) {
       setError(invokeErrorMessage(value));
@@ -1139,7 +1639,7 @@ function App() {
     setSearchDateTo("");
     setSearchFavorite("any");
     setSearchResults(null);
-    setNotice("筛选条件已清空");
+    setNotice(t("filtersCleared"));
   }
 
   function loadMoreCollections() {
@@ -1180,7 +1680,7 @@ function App() {
     setActiveView("all");
     setSelectedCollectionId(null);
     setSelectedTagFilterId(tag.id);
-    setNotice(`已筛选标签：${tag.name}`);
+    setNotice(t("filteredTag", { name: tag.name }));
   }
 
   function showNavigationView(view: NavigationView) {
@@ -1199,7 +1699,7 @@ function App() {
     setIsDetectingDuplicates(true);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中检测重复图片");
+      setNotice(t("desktopDuplicateDetection"));
       setIsDetectingDuplicates(false);
       return;
     }
@@ -1213,7 +1713,11 @@ function App() {
       });
       setDuplicateResult(result);
       setNotice(
-        `检测完成：扫描 ${result.scannedCount} 张，完全重复 ${result.exactGroups.length} 组，相似 ${result.similarGroups.length} 组`,
+        t("duplicateCompletedNotice", {
+          scanned: result.scannedCount,
+          exact: result.exactGroups.length,
+          similar: result.similarGroups.length,
+        }),
       );
       if (selectedCollectionId) {
         await refreshImages(selectedCollectionId);
@@ -1233,7 +1737,7 @@ function App() {
       return;
     }
 
-    if (!window.confirm(`保留第一张，删除其余 ${removableImages.length} 张到回收站？`)) {
+    if (!window.confirm(t("deleteDuplicateConfirm", { count: removableImages.length }))) {
       return;
     }
 
@@ -1253,7 +1757,7 @@ function App() {
     removeImagesFromCurrentView([...removedIds]);
     await refreshCollections();
     await refreshStatus();
-    setNotice(`已删除 ${removableImages.length - failed.length} 张重复图片`);
+    setNotice(t("deletedDuplicateImages", { count: removableImages.length - failed.length }));
     setError(failed.length > 0 ? failed.join("；") : null);
   }
 
@@ -1304,7 +1808,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中编辑合集");
+      setNotice(t("desktopEditCollection"));
       setIsCollectionSaving(false);
       return;
     }
@@ -1320,7 +1824,7 @@ function App() {
       });
       updateCollectionState(collection);
       setIsCollectionEditorOpen(false);
-      setNotice("合集已保存");
+      setNotice(t("collectionSaved"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     } finally {
@@ -1333,7 +1837,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中收藏合集");
+      setNotice(t("desktopFavoriteCollection"));
       return;
     }
 
@@ -1345,7 +1849,7 @@ function App() {
         },
       });
       updateCollectionState(updated);
-      setNotice(updated.isFavorite ? "已收藏合集" : "已取消收藏");
+      setNotice(updated.isFavorite ? t("favoritedCollection") : t("unfavoritedCollection"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
@@ -1360,7 +1864,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中设置封面");
+      setNotice(t("desktopSetCover"));
       return;
     }
 
@@ -1372,7 +1876,7 @@ function App() {
         },
       });
       updateCollectionState(collection);
-      setNotice("封面已更新");
+      setNotice(t("coverUpdated"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
@@ -1406,7 +1910,7 @@ function App() {
     setIsTagSaving(true);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中保存标签");
+      setNotice(t("desktopSaveTag"));
       setIsTagSaving(false);
       return;
     }
@@ -1428,7 +1932,7 @@ function App() {
       }
       await refreshStatus();
       resetTagDraft();
-      setNotice(editingTagId ? "标签已保存" : "标签已创建");
+      setNotice(editingTagId ? t("tagSaved") : t("tagCreated"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     } finally {
@@ -1437,7 +1941,7 @@ function App() {
   }
 
   async function deleteTagRecord(tag: PhotoTag) {
-    if (!window.confirm(`删除标签“${tag.name}”？关联会一并移除。`)) {
+    if (!window.confirm(t("deleteTagConfirm", { name: tag.name }))) {
       return;
     }
 
@@ -1445,7 +1949,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中删除标签");
+      setNotice(t("desktopDeleteTag"));
       return;
     }
 
@@ -1460,7 +1964,7 @@ function App() {
       if (editingTagId === tag.id) {
         resetTagDraft();
       }
-      setNotice("标签已删除");
+      setNotice(t("tagDeleted"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
@@ -1468,7 +1972,7 @@ function App() {
 
   function openTagAssignment(target: TagAssignmentTarget, currentTags: PhotoTag[]) {
     if (tags.length === 0) {
-      setNotice("请先创建标签");
+      setNotice(t("createTagFirst"));
       setActiveView("tags");
       setSelectedCollectionId(null);
       return;
@@ -1503,7 +2007,7 @@ function App() {
     setIsTagAssignmentSaving(true);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中设置标签");
+      setNotice(t("desktopSetTags"));
       setIsTagAssignmentSaving(false);
       return;
     }
@@ -1517,7 +2021,7 @@ function App() {
           ...current,
           [tagAssignmentTarget.collection.id]: assignedTags,
         }));
-        setNotice("合集标签已更新");
+        setNotice(t("collectionTagsUpdated"));
       } else if (tagAssignmentTarget.kind === "image") {
         const assignedTags = await invoke<PhotoTag[]>("set_image_tags", {
           request: { targetId: tagAssignmentTarget.image.id, tagIds: tagAssignmentIds },
@@ -1526,7 +2030,7 @@ function App() {
           ...current,
           [tagAssignmentTarget.image.id]: assignedTags,
         }));
-        setNotice("图片标签已更新");
+        setNotice(t("imageTagsUpdated"));
       } else {
         const failed: string[] = [];
         let updatedCount = 0;
@@ -1542,7 +2046,7 @@ function App() {
           }
         }
         clearImageSelection();
-        setNotice(`已设置 ${updatedCount} 张图片的标签`);
+        setNotice(t("batchTagsUpdated", { count: updatedCount }));
         setError(failed.length > 0 ? failed.join("；") : null);
       }
 
@@ -1557,7 +2061,7 @@ function App() {
   }
 
   async function renameImage(image: ImageRecord) {
-    const fileName = window.prompt("新的文件名", image.fileName)?.trim();
+    const fileName = window.prompt(t("newFileNamePrompt"), image.fileName)?.trim();
     if (!fileName || fileName === image.fileName) {
       return;
     }
@@ -1566,7 +2070,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中重命名图片");
+      setNotice(t("desktopRenameImage"));
       return;
     }
 
@@ -1576,14 +2080,14 @@ function App() {
       });
       setImages((current) => current.map((item) => (item.id === image.id ? updated : item)));
       await refreshCollections();
-      setNotice("图片已重命名");
+      setNotice(t("imageRenamed"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
   }
 
   async function moveImage(image: ImageRecord) {
-    const target = chooseTargetCollection("移动到合集");
+    const target = chooseTargetCollection(t("moveToCollectionTitle"));
     if (!target) {
       return;
     }
@@ -1592,7 +2096,7 @@ function App() {
   }
 
   async function copyImage(image: ImageRecord) {
-    const target = chooseTargetCollection("复制到合集");
+    const target = chooseTargetCollection(t("copyToCollectionTitle"));
     if (!target) {
       return;
     }
@@ -1601,7 +2105,7 @@ function App() {
   }
 
   async function deleteImage(image: ImageRecord) {
-    if (!window.confirm(`删除图片“${image.fileName}”？默认移到系统回收站。`)) {
+    if (!window.confirm(t("deleteImageConfirm", { name: image.fileName }))) {
       return;
     }
 
@@ -1609,7 +2113,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中删除图片");
+      setNotice(t("desktopDeleteImage"));
       return;
     }
 
@@ -1626,7 +2130,7 @@ function App() {
       }
       await refreshCollections();
       await refreshStatus();
-      setNotice("图片已移到回收站");
+      setNotice(t("imageMovedToTrash"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
@@ -1635,7 +2139,7 @@ function App() {
   function chooseTargetCollection(title: string): Collection | null {
     const candidates = collections.filter((collection) => collection.id !== selectedCollectionId);
     if (candidates.length === 0) {
-      setNotice("没有可用目标合集");
+      setNotice(t("noTargetCollections"));
       return null;
     }
 
@@ -1688,7 +2192,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中移动图片");
+      setNotice(t("desktopMoveImage"));
       return;
     }
 
@@ -1708,7 +2212,7 @@ function App() {
     removeImagesFromCurrentView(movedIds);
     await refreshCollections();
     await refreshStatus();
-    setNotice(`已移动 ${movedIds.length} 张到 ${target.name}`);
+    setNotice(t("movedImagesNotice", { count: movedIds.length, name: target.name }));
     setError(failed.length > 0 ? failed.join("；") : null);
   }
 
@@ -1721,7 +2225,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中复制图片");
+      setNotice(t("desktopCopyImage"));
       return;
     }
 
@@ -1741,7 +2245,7 @@ function App() {
     clearImageSelection();
     await refreshCollections();
     await refreshStatus();
-    setNotice(`已复制 ${copiedCount} 张到 ${target.name}`);
+    setNotice(t("copiedImagesNotice", { count: copiedCount, name: target.name }));
     setError(failed.length > 0 ? failed.join("；") : null);
   }
 
@@ -1770,7 +2274,7 @@ function App() {
   }
 
   async function batchMoveImages() {
-    const target = chooseTargetCollection("批量移动到合集");
+    const target = chooseTargetCollection(t("batchMoveToCollectionTitle"));
     if (!target || selectedImages.length === 0) {
       return;
     }
@@ -1779,7 +2283,7 @@ function App() {
   }
 
   async function batchCopyImages() {
-    const target = chooseTargetCollection("批量复制到合集");
+    const target = chooseTargetCollection(t("batchCopyToCollectionTitle"));
     if (!target || selectedImages.length === 0) {
       return;
     }
@@ -1803,12 +2307,12 @@ function App() {
       return;
     }
 
-    if (!window.confirm(`删除选中的 ${selectedImages.length} 张图片？默认移到系统回收站。`)) {
+    if (!window.confirm(t("batchDeleteConfirm", { count: selectedImages.length }))) {
       return;
     }
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中批量删除图片");
+      setNotice(t("desktopBatchDelete"));
       return;
     }
 
@@ -1831,7 +2335,7 @@ function App() {
     removeImagesFromCurrentView(deletedIds);
     await refreshCollections();
     await refreshStatus();
-    setNotice(`已删除 ${deletedIds.length} 张图片`);
+    setNotice(t("deletedImagesNotice", { count: deletedIds.length }));
     setError(failed.length > 0 ? failed.join("；") : null);
   }
 
@@ -1840,19 +2344,19 @@ function App() {
       return;
     }
 
-    const value = window.prompt("评分 0-5", "0")?.trim();
+    const value = window.prompt(t("ratingPrompt"), "0")?.trim();
     if (value === undefined || value === null || value === "") {
       return;
     }
 
     const rating = Number(value);
     if (!Number.isInteger(rating) || rating < 0 || rating > 5) {
-      setError("评分必须是 0 到 5 的整数");
+      setError(t("ratingError"));
       return;
     }
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中批量评分");
+      setNotice(t("desktopBatchRating"));
       return;
     }
 
@@ -1871,7 +2375,7 @@ function App() {
     }
 
     clearImageSelection();
-    setNotice(`已评分 ${selectedImages.length - failed.length} 张图片`);
+    setNotice(t("ratedImagesNotice", { count: selectedImages.length - failed.length }));
     setError(failed.length > 0 ? failed.join("；") : null);
   }
 
@@ -1917,9 +2421,7 @@ function App() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `删除合集记录“${collection.name}”？磁盘文件夹不会被删除。`,
-    );
+    const confirmed = window.confirm(t("deleteCollectionConfirm", { name: collection.name }));
     if (!confirmed) {
       return;
     }
@@ -1928,7 +2430,7 @@ function App() {
     setNotice(null);
 
     if (!isTauriRuntime()) {
-      setNotice("请在桌面应用中删除合集记录");
+      setNotice(t("desktopDeleteCollectionRecord"));
       return;
     }
 
@@ -1946,7 +2448,7 @@ function App() {
         current.filter((item) => item.id !== collection.id),
       );
       await refreshStatus();
-      setNotice("合集记录已删除，磁盘文件夹已保留");
+      setNotice(t("collectionRecordDeleted"));
     } catch (value) {
       setError(invokeErrorMessage(value));
     }
@@ -2025,25 +2527,30 @@ function App() {
   }
 
   return (
-    <main className="app-shell" data-theme={theme} style={appShellStyle(thumbnailSize)}>
-      <aside className="sidebar" aria-label="PhotoView navigation">
+    <main
+      className="app-shell"
+      data-language={appLanguage}
+      data-theme={theme}
+      style={appShellStyle(thumbnailSize)}
+    >
+      <aside className="sidebar" aria-label={t("navigation")}>
         <div className="brand">
           <span className="brand-mark">PV</span>
           <span>PhotoView</span>
         </div>
         <nav className="primary-nav">
           <button
-            aria-label="全部"
+            aria-label={t("navAll")}
             className={`nav-item ${activeView === "all" && !selectedCollection ? "active" : ""}`}
             type="button"
             onClick={() => showNavigationView("all")}
           >
             <Images size={17} aria-hidden="true" />
-            <span>全部</span>
+            <span>{t("navAll")}</span>
             <small>{collections.length}</small>
           </button>
           <button
-            aria-label="收藏"
+            aria-label={t("navFavorites")}
             className={`nav-item ${
               activeView === "favorites" && !selectedCollection ? "active" : ""
             }`}
@@ -2051,39 +2558,50 @@ function App() {
             onClick={() => showNavigationView("favorites")}
           >
             <Star size={17} aria-hidden="true" />
-            <span>收藏</span>
+            <span>{t("navFavorites")}</span>
             <small>{collections.filter((collection) => collection.isFavorite).length}</small>
           </button>
           <button
-            aria-label="最近"
+            aria-label={t("navRecent")}
             className={`nav-item ${activeView === "recent" && !selectedCollection ? "active" : ""}`}
             type="button"
             onClick={() => showNavigationView("recent")}
           >
             <Clock3 size={17} aria-hidden="true" />
-            <span>最近</span>
+            <span>{t("navRecent")}</span>
             <small>{collections.filter((collection) => collection.lastViewedAt).length}</small>
           </button>
           <button
-            aria-label="标签"
+            aria-label={t("navTags")}
             className={`nav-item ${activeView === "tags" && !selectedCollection ? "active" : ""}`}
             type="button"
             onClick={() => showNavigationView("tags")}
           >
             <Tags size={17} aria-hidden="true" />
-            <span>标签</span>
+            <span>{t("navTags")}</span>
             <small>{tags.length}</small>
           </button>
         </nav>
         <nav className="utility-nav">
           <button
-            aria-label="设置"
+            aria-label={t(appLanguage === "zh-CN" ? "switchToEnglish" : "switchToChinese")}
+            className="nav-item language-nav-button"
+            title={t(appLanguage === "zh-CN" ? "switchToEnglish" : "switchToChinese")}
+            type="button"
+            onClick={() => void updateLanguagePreference(alternateLanguage)}
+          >
+            <Languages size={17} aria-hidden="true" />
+            <span>{t("languageToggle")}</span>
+            <small>{LANGUAGE_OPTIONS.find((option) => option.value === alternateLanguage)?.shortLabel}</small>
+          </button>
+          <button
+            aria-label={t("navSettings")}
             className={`nav-item ${activeView === "settings" ? "active" : ""}`}
             type="button"
             onClick={() => showNavigationView("settings")}
           >
             <Settings size={17} aria-hidden="true" />
-            <span>设置</span>
+            <span>{t("navSettings")}</span>
           </button>
         </nav>
       </aside>
@@ -2091,8 +2609,8 @@ function App() {
       <section className="workspace">
         <header className="toolbar">
           <input
-            aria-label="搜索"
-            placeholder="搜索合集、路径或描述"
+            aria-label={t("search")}
+            placeholder={t("searchPlaceholder")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -2102,73 +2620,73 @@ function App() {
             }}
           />
           <button
-            aria-label="筛选"
+            aria-label={t("filter")}
             className="secondary-action"
             type="button"
             aria-pressed={isAdvancedSearchOpen}
-            title="筛选"
+            title={t("filter")}
             onClick={() => setIsAdvancedSearchOpen((current) => !current)}
           >
             <SlidersHorizontal size={16} aria-hidden="true" />
-            <span>筛选</span>
+            <span>{t("filter")}</span>
           </button>
           <button
-            aria-label={isSearching ? "搜索中" : "搜索"}
+            aria-label={isSearching ? t("searching") : t("search")}
             className="secondary-action"
             type="button"
             disabled={isSearching}
             aria-busy={isSearching}
-            title={isSearching ? "搜索中" : "搜索"}
+            title={isSearching ? t("searching") : t("search")}
             onClick={() => void performSearch()}
           >
             <Search size={16} aria-hidden="true" />
-            <span>{isSearching ? "搜索中" : "搜索"}</span>
+            <span>{isSearching ? t("searching") : t("search")}</span>
           </button>
           <button
-            aria-label={isDetectingDuplicates ? "重复检测中" : "重复检测"}
+            aria-label={isDetectingDuplicates ? t("duplicateDetecting") : t("duplicateDetection")}
             className="secondary-action"
             type="button"
             disabled={isDetectingDuplicates}
             aria-busy={isDetectingDuplicates}
-            title={isDetectingDuplicates ? "重复检测中" : "重复检测"}
+            title={isDetectingDuplicates ? t("duplicateDetecting") : t("duplicateDetection")}
             onClick={() => void runDuplicateDetection()}
           >
             <Copy size={16} aria-hidden="true" />
-            <span>{isDetectingDuplicates ? "检测中" : "重复"}</span>
+            <span>{isDetectingDuplicates ? t("detecting") : t("duplicateShort")}</span>
           </button>
           <button
-            aria-label={isSyncing ? "同步中" : "同步图库"}
+            aria-label={isSyncing ? t("syncing") : t("syncLibrary")}
             className="secondary-action"
             type="button"
             disabled={isSyncing}
             aria-busy={isSyncing}
-            title={isSyncing ? "同步中" : "同步图库"}
+            title={isSyncing ? t("syncing") : t("syncLibrary")}
             onClick={() => void syncLibrary()}
           >
             <RotateCw size={16} aria-hidden="true" />
-            <span>{isSyncing ? "同步中" : "同步"}</span>
+            <span>{isSyncing ? t("syncing") : t("syncShort")}</span>
           </button>
           <button
-            aria-label={isImporting ? "取消导入" : "导入文件夹"}
+            aria-label={isImporting ? t("cancelImport") : t("importFolder")}
             className="primary-action"
             type="button"
             aria-busy={isImporting}
-            title={isImporting ? "取消导入" : "导入文件夹"}
+            title={isImporting ? t("cancelImport") : t("importFolder")}
             onClick={isImporting ? cancelImport : handleChooseImportFolder}
           >
             <FolderPlus size={16} aria-hidden="true" />
-            <span>{isImporting ? "取消" : "导入"}</span>
+            <span>{isImporting ? t("cancel") : t("importAction")}</span>
           </button>
         </header>
 
         <section className="content">
           {isAdvancedSearchOpen ? (
-            <section className="advanced-search" aria-label="高级搜索">
+            <section className="advanced-search" aria-label={t("advancedSearch")}>
               <label>
-                <span>格式</span>
+                <span>{t("format")}</span>
                 <select
                   multiple
-                  aria-label="搜索格式"
+                  aria-label={t("format")}
                   value={searchFormats}
                   onChange={(event) =>
                     setSearchFormats(
@@ -2184,10 +2702,10 @@ function App() {
                 </select>
               </label>
               <label>
-                <span>标签</span>
+                <span>{t("tagsLabel")}</span>
                 <select
                   multiple
-                  aria-label="搜索标签"
+                  aria-label={t("tagsLabel")}
                   value={searchTagIds}
                   onChange={(event) =>
                     setSearchTagIds(
@@ -2203,92 +2721,92 @@ function App() {
                 </select>
               </label>
               <label>
-                <span>宽度</span>
+                <span>{t("width")}</span>
                 <div className="range-inputs">
                   <input
-                    aria-label="最小宽度"
+                    aria-label={t("minWidth")}
                     inputMode="numeric"
-                    placeholder="min"
+                    placeholder={t("minPlaceholder")}
                     value={searchMinWidth}
                     onChange={(event) => setSearchMinWidth(event.target.value)}
                   />
                   <input
-                    aria-label="最大宽度"
+                    aria-label={t("maxWidth")}
                     inputMode="numeric"
-                    placeholder="max"
+                    placeholder={t("maxPlaceholder")}
                     value={searchMaxWidth}
                     onChange={(event) => setSearchMaxWidth(event.target.value)}
                   />
                 </div>
               </label>
               <label>
-                <span>高度</span>
+                <span>{t("height")}</span>
                 <div className="range-inputs">
                   <input
-                    aria-label="最小高度"
+                    aria-label={t("minHeight")}
                     inputMode="numeric"
-                    placeholder="min"
+                    placeholder={t("minPlaceholder")}
                     value={searchMinHeight}
                     onChange={(event) => setSearchMinHeight(event.target.value)}
                   />
                   <input
-                    aria-label="最大高度"
+                    aria-label={t("maxHeight")}
                     inputMode="numeric"
-                    placeholder="max"
+                    placeholder={t("maxPlaceholder")}
                     value={searchMaxHeight}
                     onChange={(event) => setSearchMaxHeight(event.target.value)}
                   />
                 </div>
               </label>
               <label>
-                <span>大小 MB</span>
+                <span>{t("sizeMb")}</span>
                 <div className="range-inputs">
                   <input
-                    aria-label="最小大小"
+                    aria-label={t("minSize")}
                     inputMode="decimal"
-                    placeholder="min"
+                    placeholder={t("minPlaceholder")}
                     value={searchMinSizeMb}
                     onChange={(event) => setSearchMinSizeMb(event.target.value)}
                   />
                   <input
-                    aria-label="最大大小"
+                    aria-label={t("maxSize")}
                     inputMode="decimal"
-                    placeholder="max"
+                    placeholder={t("maxPlaceholder")}
                     value={searchMaxSizeMb}
                     onChange={(event) => setSearchMaxSizeMb(event.target.value)}
                   />
                 </div>
               </label>
               <label>
-                <span>评分</span>
+                <span>{t("rating")}</span>
                 <div className="range-inputs">
                   <input
-                    aria-label="最低评分"
+                    aria-label={t("minRating")}
                     inputMode="numeric"
-                    placeholder="min"
+                    placeholder={t("minPlaceholder")}
                     value={searchMinRating}
                     onChange={(event) => setSearchMinRating(event.target.value)}
                   />
                   <input
-                    aria-label="最高评分"
+                    aria-label={t("maxRating")}
                     inputMode="numeric"
-                    placeholder="max"
+                    placeholder={t("maxPlaceholder")}
                     value={searchMaxRating}
                     onChange={(event) => setSearchMaxRating(event.target.value)}
                   />
                 </div>
               </label>
               <label>
-                <span>日期</span>
+                <span>{t("date")}</span>
                 <div className="range-inputs">
                   <input
-                    aria-label="开始日期"
+                    aria-label={t("startDate")}
                     type="date"
                     value={searchDateFrom}
                     onChange={(event) => setSearchDateFrom(event.target.value)}
                   />
                   <input
-                    aria-label="结束日期"
+                    aria-label={t("endDate")}
                     type="date"
                     value={searchDateTo}
                     onChange={(event) => setSearchDateTo(event.target.value)}
@@ -2296,36 +2814,36 @@ function App() {
                 </div>
               </label>
               <label>
-                <span>收藏</span>
+                <span>{t("favorite")}</span>
                 <select
-                  aria-label="收藏状态"
+                  aria-label={t("favoriteState")}
                   value={searchFavorite}
                   onChange={(event) => setSearchFavorite(event.target.value)}
                 >
-                  <option value="any">不限</option>
-                  <option value="favorite">已收藏</option>
-                  <option value="plain">未收藏</option>
+                  <option value="any">{t("any")}</option>
+                  <option value="favorite">{t("favorited")}</option>
+                  <option value="plain">{t("notFavorited")}</option>
                 </select>
               </label>
               <div className="advanced-search-actions">
                 <button className="primary-action" type="button" onClick={() => void performSearch()}>
-                  应用筛选
+                  {t("applyFilters")}
                 </button>
                 <button className="secondary-action" type="button" onClick={resetSearchFilters}>
-                  重置
+                  {t("reset")}
                 </button>
               </div>
             </section>
           ) : null}
 
           {searchResults ? (
-            <section className="search-results" aria-label="搜索结果">
+            <section className="search-results" aria-label={t("searchResults")}>
               <header>
-                <strong>搜索结果</strong>
+                <strong>{t("searchResults")}</strong>
                 <button
-                  aria-label="关闭搜索结果"
+                  aria-label={t("closeSearchResults")}
                   className="icon-button compact"
-                  title="关闭搜索结果"
+                  title={t("closeSearchResults")}
                   type="button"
                   onClick={clearSearchResults}
                 >
@@ -2334,8 +2852,8 @@ function App() {
               </header>
               <div className="search-result-groups">
                 <SearchResultGroup
-                  title="合集"
-                  emptyText="无合集"
+                  title={t("collections")}
+                  emptyText={t("noCollections")}
                   items={searchResults.collections.map((collection) => ({
                     id: collection.id,
                     title: collection.name,
@@ -2344,8 +2862,8 @@ function App() {
                   }))}
                 />
                 <SearchResultGroup
-                  title="图片"
-                  emptyText="无图片"
+                  title={t("images")}
+                  emptyText={t("noImages")}
                   items={searchResults.images.map((image) => ({
                     id: image.id,
                     title: image.fileName,
@@ -2354,8 +2872,8 @@ function App() {
                   }))}
                 />
                 <SearchResultGroup
-                  title="标签"
-                  emptyText="无标签"
+                  title={t("tagsLabel")}
+                  emptyText={t("noTags")}
                   items={searchResults.tags.map((tag) => ({
                     id: tag.id,
                     title: tag.name,
@@ -2368,15 +2886,18 @@ function App() {
           ) : null}
 
           {duplicateResult ? (
-            <section className="duplicate-results" aria-label="重复检测结果">
+            <section className="duplicate-results" aria-label={t("duplicateResults")}>
               <header>
                 <strong>
-                  重复检测：{duplicateResult.hashedCount}/{duplicateResult.scannedCount} 张
+                  {t("duplicateSummary", {
+                    hashed: duplicateResult.hashedCount,
+                    scanned: duplicateResult.scannedCount,
+                  })}
                 </strong>
                 <button
-                  aria-label="关闭重复检测结果"
+                  aria-label={t("closeDuplicateResults")}
                   className="icon-button compact"
-                  title="关闭重复检测结果"
+                  title={t("closeDuplicateResults")}
                   type="button"
                   onClick={() => setDuplicateResult(null)}
                 >
@@ -2391,10 +2912,11 @@ function App() {
                       key={group.id}
                       onDelete={() => void deleteDuplicateRemainders(group)}
                       onOpen={(image) => openSearchImage(image)}
+                      t={t}
                     />
                   ))
                 ) : (
-                  <p>未发现重复图片</p>
+                  <p>{t("noDuplicateImages")}</p>
                 )}
               </div>
             </section>
@@ -2404,9 +2926,9 @@ function App() {
             <>
               <div className="section-heading detail-heading">
                 <button
-                  aria-label="返回合集"
+                  aria-label={t("backToCollections")}
                   className="icon-button"
-                  title="返回合集"
+                  title={t("backToCollections")}
                   type="button"
                   onClick={() => setSelectedCollectionId(null)}
                 >
@@ -2416,13 +2938,21 @@ function App() {
                 <div className="detail-actions">
                   <span>
                     {selectedTagFilterId === "all"
-                      ? `${images.length} 张图片`
-                      : `${visibleImages.length}/${images.length} 张图片`}
+                      ? t("statusImageCount", { count: images.length })
+                      : `${visibleImages.length}/${t("statusImageCount", { count: images.length })}`}
                   </span>
                   <button
-                    aria-label={selectedCollection.isFavorite ? "取消收藏合集" : "收藏合集"}
+                    aria-label={
+                      selectedCollection.isFavorite
+                        ? t("unfavoriteCollection")
+                        : t("favoriteCollection")
+                    }
                     className="icon-button"
-                    title={selectedCollection.isFavorite ? "取消收藏合集" : "收藏合集"}
+                    title={
+                      selectedCollection.isFavorite
+                        ? t("unfavoriteCollection")
+                        : t("favoriteCollection")
+                    }
                     type="button"
                     onClick={() => void toggleCollectionFavorite(selectedCollection)}
                   >
@@ -2433,27 +2963,27 @@ function App() {
                     />
                   </button>
                   <button
-                    aria-label="设置合集标签"
+                    aria-label={t("setCollectionTags")}
                     className="icon-button"
-                    title="设置合集标签"
+                    title={t("setCollectionTags")}
                     type="button"
                     onClick={() => void assignTagsToCollection(selectedCollection)}
                   >
                     <TagIcon size={16} aria-hidden="true" />
                   </button>
                   <button
-                    aria-label="编辑合集"
+                    aria-label={t("editCollection")}
                     className="icon-button"
-                    title="编辑合集"
+                    title={t("editCollection")}
                     type="button"
                     onClick={() => openCollectionEditor(selectedCollection)}
                   >
                     <Pencil size={16} aria-hidden="true" />
                   </button>
                   <button
-                    aria-label="删除合集记录"
+                    aria-label={t("deleteCollectionRecord")}
                     className="icon-button danger"
-                    title="删除合集记录"
+                    title={t("deleteCollectionRecord")}
                     type="button"
                     onClick={() => void deleteCollectionRecord(selectedCollection)}
                   >
@@ -2465,9 +2995,9 @@ function App() {
               <div className="detail-meta">
                 <span>{selectedCollection.path}</span>
                 <button
-                  aria-label="打开所在位置"
+                  aria-label={t("openLocation")}
                   className="icon-button"
-                  title="打开所在位置"
+                  title={t("openLocation")}
                   type="button"
                   onClick={() => void openPath(selectedCollection.path)}
                 >
@@ -2477,31 +3007,31 @@ function App() {
 
               <div className="detail-filter-controls">
                 <select
-                  aria-label="图片标签筛选"
+                  aria-label={t("imageTagFilter")}
                   value={selectedTagFilterId}
                   onChange={(event) => setSelectedTagFilterId(event.target.value)}
                 >
-                  <option value="all">全部标签</option>
+                  <option value="all">{t("allTags")}</option>
                   {tags.map((tag) => (
                     <option key={tag.id} value={tag.id}>
                       {tag.name}
                     </option>
                   ))}
                 </select>
-                <div className="segmented-control" aria-label="图片视图">
+                <div className="segmented-control" aria-label={t("imageView")}>
                   <button
-                    aria-label="图片列表视图"
+                    aria-label={t("imageListView")}
                     className={imageViewMode === "list" ? "active" : ""}
-                    title="列表视图"
+                    title={t("listView")}
                     type="button"
                     onClick={() => setImageViewMode("list")}
                   >
                     <List size={16} aria-hidden="true" />
                   </button>
                   <button
-                    aria-label="图片网格视图"
+                    aria-label={t("imageGridView")}
                     className={imageViewMode === "grid" ? "active" : ""}
-                    title="网格视图"
+                    title={t("gridView")}
                     type="button"
                     onClick={() => setImageViewMode("grid")}
                   >
@@ -2511,7 +3041,7 @@ function App() {
               </div>
 
               {selectedCollectionTags.length > 0 ? (
-                <div className="tag-strip" aria-label="合集标签">
+                <div className="tag-strip" aria-label={t("collectionTags")}>
                   {selectedCollectionTags.map((tag) => (
                     <span className="tag-chip" key={tag.id} style={tagChipStyle(tag)}>
                       {tag.name}
@@ -2521,41 +3051,41 @@ function App() {
               ) : null}
 
               {selectedImages.length > 0 ? (
-                <div className="batch-toolbar" aria-label="批量图片操作">
-                  <span>已选 {selectedImages.length} 张</span>
+                <div className="batch-toolbar" aria-label={t("batchImageActions")}>
+                  <span>{t("selectedImageCount", { count: selectedImages.length })}</span>
                   <button type="button" onClick={() => void batchMoveImages()}>
                     <MoveRight size={15} aria-hidden="true" />
-                    <span>移动</span>
+                    <span>{t("move")}</span>
                   </button>
                   <button type="button" onClick={() => void batchCopyImages()}>
                     <Copy size={15} aria-hidden="true" />
-                    <span>复制</span>
+                    <span>{t("copy")}</span>
                   </button>
                   <button type="button" onClick={() => void batchSetImageTags()}>
                     <TagIcon size={15} aria-hidden="true" />
-                    <span>标签</span>
+                    <span>{t("tag")}</span>
                   </button>
                   <button type="button" onClick={() => void batchRateImages()}>
                     <Star size={15} aria-hidden="true" />
-                    <span>评分</span>
+                    <span>{t("rating")}</span>
                   </button>
                   <button className="danger" type="button" onClick={() => void batchDeleteImages()}>
                     <Trash2 size={15} aria-hidden="true" />
-                    <span>删除</span>
+                    <span>{t("delete")}</span>
                   </button>
                   <button type="button" onClick={clearImageSelection}>
                     <X size={15} aria-hidden="true" />
-                    <span>取消</span>
+                    <span>{t("cancel")}</span>
                   </button>
                 </div>
               ) : null}
 
               {collectionDropTargets.length > 0 &&
               (selectedImages.length > 0 || draggedImageIds.length > 0) ? (
-                <div className="collection-drop-strip" aria-label="图片移动目标">
+                <div className="collection-drop-strip" aria-label={t("imageMoveTargets")}>
                   {collectionDropTargets.map((collection) => (
                     <button
-                      aria-label={`移动到 ${collection.name}`}
+                      aria-label={t("moveToCollection", { name: collection.name })}
                       className={`collection-drop-target ${
                         dragOverCollectionId === collection.id ? "over" : ""
                       }`}
@@ -2573,7 +3103,7 @@ function App() {
                     >
                       <Images size={16} aria-hidden="true" />
                       <span>{collection.name}</span>
-                      <small>{collection.imageCount} 张</small>
+                      <small>{t("collectionImageCount", { count: collection.imageCount })}</small>
                     </button>
                   ))}
                 </div>
@@ -2586,8 +3116,8 @@ function App() {
               >
                 {imagesLoading ? (
                   <div className="empty-state">
-                    <h2>加载中</h2>
-                    <p>正在读取图片索引。</p>
+                    <h2>{t("loading")}</h2>
+                    <p>{t("readingImageIndex")}</p>
                   </div>
                 ) : visibleImages.length > 0 ? (
                   imageViewMode === "list" ? (
@@ -2634,7 +3164,7 @@ function App() {
                             onClick={(event) => event.stopPropagation()}
                           >
                             <input
-                              aria-label="选择图片"
+                              aria-label={t("selectImage")}
                               checked={selectedImageIds.has(image.id)}
                               type="checkbox"
                               onChange={() => toggleImageSelection(image.id)}
@@ -2655,7 +3185,7 @@ function App() {
                             <h2>{image.fileName}</h2>
                             <p>{image.path}</p>
                             {(imageTagMap[image.id] ?? []).length > 0 ? (
-                              <div className="tag-chip-row" aria-label="图片标签">
+                              <div className="tag-chip-row" aria-label={t("imageTags")}>
                                 {(imageTagMap[image.id] ?? []).map((tag) => (
                                   <span
                                     className="tag-chip compact"
@@ -2673,13 +3203,13 @@ function App() {
                             <span>
                               {image.width && image.height
                                 ? `${image.width} x ${image.height}`
-                                : "尺寸未知"}
+                                : t("unknownDimensions")}
                             </span>
                             <span>{formatBytes(image.sizeBytes)}</span>
                             <button
-                              aria-label="设置图片标签"
+                              aria-label={t("setImageTags")}
                               className="icon-button compact secondary-row-action"
-                              title="设置图片标签"
+                              title={t("setImageTags")}
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -2689,9 +3219,9 @@ function App() {
                               <TagIcon size={14} aria-hidden="true" />
                             </button>
                             <button
-                              aria-label="设为封面"
+                              aria-label={t("setAsCover")}
                               className="icon-button compact"
-                              title="设为封面"
+                              title={t("setAsCover")}
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -2705,9 +3235,9 @@ function App() {
                               )}
                             </button>
                             <button
-                              aria-label="重命名图片"
+                              aria-label={t("renameImage")}
                               className="icon-button compact secondary-row-action"
-                              title="重命名图片"
+                              title={t("renameImage")}
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -2717,9 +3247,9 @@ function App() {
                               <Pencil size={14} aria-hidden="true" />
                             </button>
                             <button
-                              aria-label="移动图片"
+                              aria-label={t("moveImage")}
                               className="icon-button compact"
-                              title="移动图片"
+                              title={t("moveImage")}
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -2729,9 +3259,9 @@ function App() {
                               <MoveRight size={14} aria-hidden="true" />
                             </button>
                             <button
-                              aria-label="复制图片"
+                              aria-label={t("copyImage")}
                               className="icon-button compact secondary-row-action"
-                              title="复制图片"
+                              title={t("copyImage")}
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -2741,9 +3271,9 @@ function App() {
                               <Copy size={14} aria-hidden="true" />
                             </button>
                             <button
-                              aria-label="删除图片"
+                              aria-label={t("deleteImage")}
                               className="icon-button compact danger secondary-row-action"
-                              title="删除图片"
+                              title={t("deleteImage")}
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -2816,11 +3346,11 @@ function App() {
                   )
                 ) : (
                   <div className="empty-state">
-                    <h2>{images.length > 0 ? "没有匹配图片" : "暂无图片"}</h2>
+                    <h2>{images.length > 0 ? t("noMatchingImages") : t("noImagesYet")}</h2>
                     <p>
                       {images.length > 0
-                        ? "调整标签筛选后再试。"
-                        : "重新导入或检查文件夹权限后再试。"}
+                        ? t("adjustTagFilter")
+                        : t("reimportCheckPermissions")}
                     </p>
                   </div>
                 )}
@@ -2830,48 +3360,57 @@ function App() {
             <>
               <div className="section-heading">
                 <div>
-                  <h1>设置</h1>
-                  <p className="section-subtitle">偏好与本地数据管理</p>
+                  <h1>{t("settings")}</h1>
+                  <p className="section-subtitle">{t("settingsSubtitle")}</p>
                 </div>
               </div>
 
-              <section className="settings-page" aria-label="设置">
+              <section className="settings-page" aria-label={t("settings")}>
                 <article className="settings-card">
                   <header>
                     <Settings size={18} aria-hidden="true" />
-                    <h2>偏好</h2>
+                    <h2>{t("preferences")}</h2>
                   </header>
                   <div className="settings-grid">
                     <label>
-                      <span>主题</span>
+                      <span>{t("theme")}</span>
                       <select value={theme} onChange={(event) => setTheme(event.target.value)}>
-                        <option value="system">系统</option>
-                        <option value="light">浅色</option>
-                        <option value="dark">深色</option>
+                        <option value="system">{t("system")}</option>
+                        <option value="light">{t("light")}</option>
+                        <option value="dark">{t("dark")}</option>
                       </select>
                     </label>
+                    <div className="setting-field">
+                      <span>{t("language")}</span>
+                      <div className="language-segmented" role="group" aria-label={t("language")}>
+                        {LANGUAGE_OPTIONS.map((option) => (
+                          <button
+                            aria-pressed={appLanguage === option.value}
+                            className={appLanguage === option.value ? "active" : ""}
+                            key={option.value}
+                            type="button"
+                            onClick={() => void updateLanguagePreference(option.value)}
+                          >
+                            {t(option.labelKey)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <label>
-                      <span>语言</span>
-                      <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-                        <option value="zh-CN">简体中文</option>
-                        <option value="en-US">English</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>快捷键</span>
+                      <span>{t("shortcuts")}</span>
                       <select
                         value={shortcutProfile}
                         onChange={(event) => setShortcutProfile(event.target.value)}
                       >
-                        <option value="default">默认</option>
+                        <option value="default">{t("defaultShortcut")}</option>
                         <option value="vim">Vim</option>
-                        <option value="minimal">精简</option>
+                        <option value="minimal">{t("minimalShortcut")}</option>
                       </select>
                     </label>
                     <label>
-                      <span>缩略图</span>
+                      <span>{t("thumbnails")}</span>
                       <input
-                        aria-label="缩略图"
+                        aria-label={t("thumbnails")}
                         max={512}
                         min={64}
                         type="number"
@@ -2882,7 +3421,7 @@ function App() {
                   </div>
                   <footer>
                     <button className="primary-action" type="button" onClick={() => void savePreferences()}>
-                      保存偏好
+                      {t("savePreferences")}
                     </button>
                   </footer>
                 </article>
@@ -2890,20 +3429,20 @@ function App() {
                 <article className="settings-card">
                   <header>
                     <Info size={18} aria-hidden="true" />
-                    <h2>数据管理</h2>
+                    <h2>{t("dataManagement")}</h2>
                   </header>
                   <div className="settings-actions">
                     <button type="button" onClick={() => void runDataTool("backup_database")}>
-                      备份数据库
+                      {t("backupDatabase")}
                     </button>
                     <button type="button" onClick={() => void restoreDatabase()}>
-                      恢复数据库
+                      {t("restoreDatabase")}
                     </button>
                     <button type="button" onClick={() => void runDataTool("rebuild_index")}>
-                      重建索引
+                      {t("rebuildIndex")}
                     </button>
                     <button type="button" onClick={() => void runDataTool("export_library_data")}>
-                      导出数据
+                      {t("exportData")}
                     </button>
                   </div>
                 </article>
@@ -2913,18 +3452,18 @@ function App() {
             <>
               <div className="section-heading">
                 <div>
-                  <h1>标签</h1>
-                  <p className="section-subtitle">{tags.length} 个标签</p>
+                  <h1>{t("tagsLabel")}</h1>
+                  <p className="section-subtitle">{t("tagCount", { count: tags.length })}</p>
                 </div>
               </div>
 
               <form
                 className="tag-editor-panel"
-                aria-label={editingTagId ? "编辑标签" : "新建标签"}
+                aria-label={editingTagId ? t("editTag") : t("newTag")}
                 onSubmit={(event) => void saveTagDraft(event)}
               >
                 <label>
-                  <span>标签名称</span>
+                  <span>{t("tagName")}</span>
                   <input
                     required
                     value={tagDraftName}
@@ -2932,9 +3471,9 @@ function App() {
                   />
                 </label>
                 <label className="tag-color-field">
-                  <span>颜色</span>
+                  <span>{t("color")}</span>
                   <input
-                    aria-label="标签颜色"
+                    aria-label={t("tagColor")}
                     type="color"
                     value={tagDraftColor}
                     onChange={(event) => setTagDraftColor(event.target.value)}
@@ -2943,16 +3482,16 @@ function App() {
                 <footer>
                   {editingTagId ? (
                     <button className="secondary-action" type="button" onClick={resetTagDraft}>
-                      取消编辑
+                      {t("cancelEdit")}
                     </button>
                   ) : null}
                   <button className="primary-action" disabled={isTagSaving} type="submit">
-                    {isTagSaving ? "保存中" : editingTagId ? "保存标签" : "添加标签"}
+                    {isTagSaving ? t("saving") : editingTagId ? t("saveTag") : t("addTag")}
                   </button>
                 </footer>
               </form>
 
-              <section className="tag-gallery" aria-label="标签">
+              <section className="tag-gallery" aria-label={t("tagsLabel")}>
                 {tags.length > 0 ? (
                   tags.map((tag) => (
                     <article className="tag-card" key={tag.id}>
@@ -2967,18 +3506,18 @@ function App() {
                       </button>
                       <div className="tag-card-actions">
                         <button
-                          aria-label={`编辑标签 ${tag.name}`}
+                          aria-label={`${t("editTag")} ${tag.name}`}
                           className="icon-button compact"
-                          title="编辑标签"
+                          title={t("editTag")}
                           type="button"
                           onClick={() => startEditTag(tag)}
                         >
                           <Pencil size={14} aria-hidden="true" />
                         </button>
                         <button
-                          aria-label={`删除标签 ${tag.name}`}
+                          aria-label={`${t("delete")} ${tag.name}`}
                           className="icon-button compact danger"
-                          title="删除标签"
+                          title={t("delete")}
                           type="button"
                           onClick={() => void deleteTagRecord(tag)}
                         >
@@ -2989,7 +3528,7 @@ function App() {
                   ))
                 ) : (
                   <div className="empty-state">
-                    <h2>暂无标签</h2>
+                    <h2>{t("noTagsYet")}</h2>
                   </div>
                 )}
               </section>
@@ -2997,32 +3536,36 @@ function App() {
           ) : (
             <>
               <div className="section-heading">
-                <h1>{collectionViewTitle(activeView, selectedTagFilterId, tags)}</h1>
+                <h1>{collectionViewTitle(activeView, selectedTagFilterId, tags, t)}</h1>
                 <span>
                   {status
-                    ? `${renderedCollections.length}/${visibleCollections.length}/${status.collection_count} 个合集`
-                    : "初始化中"}
+                    ? t("collectionCountStatus", {
+                        rendered: renderedCollections.length,
+                        visible: visibleCollections.length,
+                        total: status.collection_count,
+                      })
+                    : t("initializing")}
                 </span>
               </div>
 
               <div className="collection-controls">
                 <div className="collection-filter-controls">
                   <select
-                    aria-label="合集排序"
+                    aria-label={t("collectionSort")}
                     value={sortKey}
                     onChange={(event) => setSortKey(event.target.value as CollectionSortKey)}
                   >
-                    <option value="imported">最近导入</option>
-                    <option value="name">名称</option>
-                    <option value="images">图片数量</option>
-                    <option value="size">占用空间</option>
+                    <option value="imported">{t("recentImport")}</option>
+                    <option value="name">{t("name")}</option>
+                    <option value="images">{t("imageCount")}</option>
+                    <option value="size">{t("storageSize")}</option>
                   </select>
                   <select
-                    aria-label="标签筛选"
+                    aria-label={t("tagFilter")}
                     value={selectedTagFilterId}
                     onChange={(event) => setSelectedTagFilterId(event.target.value)}
                   >
-                    <option value="all">全部标签</option>
+                    <option value="all">{t("allTags")}</option>
                     {tags.map((tag) => (
                       <option key={tag.id} value={tag.id}>
                         {tag.name}
@@ -3031,20 +3574,20 @@ function App() {
                   </select>
                 </div>
                 <div className="collection-view-controls">
-                  <div className="segmented-control" aria-label="合集视图">
+                  <div className="segmented-control" aria-label={t("collectionView")}>
                     <button
-                      aria-label="网格视图"
+                      aria-label={t("gridView")}
                       className={viewMode === "grid" ? "active" : ""}
-                      title="网格视图"
+                      title={t("gridView")}
                       type="button"
                       onClick={() => setViewMode("grid")}
                     >
                       <Grid2X2 size={16} aria-hidden="true" />
                     </button>
                     <button
-                      aria-label="列表视图"
+                      aria-label={t("listView")}
                       className={viewMode === "list" ? "active" : ""}
-                      title="列表视图"
+                      title={t("listView")}
                       type="button"
                       onClick={() => setViewMode("list")}
                     >
@@ -3061,8 +3604,8 @@ function App() {
               >
                 {collectionsLoading ? (
                   <div className="empty-state">
-                    <h2>加载中</h2>
-                    <p>正在读取本地合集索引。</p>
+                    <h2>{t("loading")}</h2>
+                    <p>{t("readingCollectionIndex")}</p>
                   </div>
                 ) : visibleCollections.length > 0 ? (
                   <>
@@ -3092,11 +3635,11 @@ function App() {
                         <div className="collection-main">
                           <div className="collection-title-row">
                             <h2>{collection.name}</h2>
-                            {collection.isFavorite ? <Star size={15} aria-label="已收藏" /> : null}
+                            {collection.isFavorite ? <Star size={15} aria-label={t("favorited")} /> : null}
                           </div>
                           <p>{collection.path}</p>
                           {(collectionTagMap[collection.id] ?? []).length > 0 ? (
-                            <div className="tag-chip-row" aria-label="合集标签">
+                            <div className="tag-chip-row" aria-label={t("collectionTags")}>
                               {(collectionTagMap[collection.id] ?? []).map((tag) => (
                                 <span
                                   className="tag-chip compact"
@@ -3109,17 +3652,25 @@ function App() {
                             </div>
                           ) : null}
                           <div className="collection-meta">
-                            <span>{collection.imageCount} 张</span>
+                            <span>{t("collectionImageCount", { count: collection.imageCount })}</span>
                             <span>{formatBytes(collection.totalSizeBytes)}</span>
-                            <span>{formatDate(collection.importedAt)}</span>
-                            <span>评分 {collection.rating}/5</span>
+                            <span>{formatDate(collection.importedAt, appLanguage)}</span>
+                            <span>{t("collectionRating", { rating: collection.rating })}</span>
                           </div>
                         </div>
                         <div className="collection-actions">
                           <button
-                            aria-label={collection.isFavorite ? "取消收藏合集" : "收藏合集"}
+                            aria-label={
+                              collection.isFavorite
+                                ? t("unfavoriteCollection")
+                                : t("favoriteCollection")
+                            }
                             className="icon-button"
-                            title={collection.isFavorite ? "取消收藏合集" : "收藏合集"}
+                            title={
+                              collection.isFavorite
+                                ? t("unfavoriteCollection")
+                                : t("favoriteCollection")
+                            }
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
@@ -3133,9 +3684,9 @@ function App() {
                             />
                           </button>
                           <button
-                            aria-label="设置合集标签"
+                            aria-label={t("setCollectionTags")}
                             className="icon-button secondary-card-action"
-                            title="设置合集标签"
+                            title={t("setCollectionTags")}
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
@@ -3145,9 +3696,9 @@ function App() {
                             <TagIcon size={16} aria-hidden="true" />
                           </button>
                           <button
-                            aria-label="复制路径"
+                            aria-label={t("copiedPath")}
                             className="icon-button secondary-card-action"
-                            title="复制路径"
+                            title={t("copiedPath")}
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
@@ -3157,9 +3708,9 @@ function App() {
                             <Copy size={16} aria-hidden="true" />
                           </button>
                           <button
-                            aria-label="打开所在位置"
+                            aria-label={t("openLocation")}
                             className="icon-button secondary-card-action"
-                            title="打开所在位置"
+                            title={t("openLocation")}
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
@@ -3169,9 +3720,9 @@ function App() {
                             <ExternalLink size={16} aria-hidden="true" />
                           </button>
                           <button
-                            aria-label="删除合集记录"
+                            aria-label={t("deleteCollectionRecord")}
                             className="icon-button danger secondary-card-action"
-                            title="删除合集记录"
+                            title={t("deleteCollectionRecord")}
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
@@ -3185,17 +3736,17 @@ function App() {
                     ))}
                     {hasMoreCollections ? (
                       <button className="load-more-collections" type="button" onClick={loadMoreCollections}>
-                        加载更多合集
+                        {t("loadMoreCollections")}
                       </button>
                     ) : null}
                   </>
                 ) : (
                   <div className="empty-state">
-                    <h2>{collections.length > 0 ? "没有匹配合集" : "暂无合集"}</h2>
+                    <h2>{collections.length > 0 ? t("noMatchingCollections") : t("noCollectionsYet")}</h2>
                     <p>
                       {collections.length > 0
-                        ? "调整搜索关键词后再试。"
-                        : "选择本地图片文件夹后，PhotoView 会在本机建立索引。"}
+                        ? t("adjustSearchKeywords")
+                        : t("importFolderEmptyDescription")}
                     </p>
                     {collections.length === 0 ? (
                       <button
@@ -3205,7 +3756,7 @@ function App() {
                         onClick={handleChooseImportFolder}
                       >
                         <FolderPlus size={16} aria-hidden="true" />
-                        <span>{isImporting ? "导入中" : "导入文件夹"}</span>
+                        <span>{isImporting ? t("importing") : t("importFolder")}</span>
                       </button>
                     ) : null}
                   </div>
@@ -3215,22 +3766,22 @@ function App() {
           )}
 
           {selectedImportPath ? (
-            <div className="selected-folder" aria-label="已选择的导入文件夹">
+            <div className="selected-folder" aria-label={t("selectedImportFolder")}>
               <span>{selectedImportPath}</span>
               <div className="selected-folder-actions">
                 <button
-                  aria-label="复制路径"
+                  aria-label={t("copiedPath")}
                   className="icon-button"
-                  title="复制路径"
+                  title={t("copiedPath")}
                   type="button"
                   onClick={handleCopyPath}
                 >
                   <Copy size={16} aria-hidden="true" />
                 </button>
                 <button
-                  aria-label="打开所在位置"
+                  aria-label={t("openLocation")}
                   className="icon-button"
-                  title="打开所在位置"
+                  title={t("openLocation")}
                   type="button"
                   onClick={handleOpenPath}
                 >
@@ -3241,13 +3792,13 @@ function App() {
           ) : null}
 
           {importProgress ? (
-            <div className="import-progress" aria-label="导入进度">
+            <div className="import-progress" aria-label={t("importProgress")}>
               <div>
-                <strong>{importProgressPhaseText(importProgress.phase)}</strong>
+                <strong>{importProgressPhaseText(importProgress.phase, t)}</strong>
                 <span>
-                  {importProgress.processedCount}/{importProgress.totalCount} 个
-                  {importProgressUnit(importProgress.phase)}，
-                  已生成 {importProgress.collectionCount} 个合集
+                  {importProgress.processedCount}/{importProgress.totalCount}{" "}
+                  {importProgressUnit(importProgress.phase, t)} ·{" "}
+                  {t("generatedCollections", { count: importProgress.collectionCount })}
                 </span>
               </div>
               <progress
@@ -3268,11 +3819,11 @@ function App() {
                 <span>
                   Schema v{status.schema_version}/{status.current_schema_version}
                 </span>
-                <span>{status.image_count} 张图片</span>
-                <span>{status.tag_count} 个标签</span>
+                <span>{t("statusImageCount", { count: status.image_count })}</span>
+                <span>{t("statusTagCount", { count: status.tag_count })}</span>
               </>
             ) : (
-              <span>正在初始化数据库</span>
+              <span>{t("importingDatabase")}</span>
             )}
           </footer>
         </section>
@@ -3293,7 +3844,7 @@ function App() {
               openViewer(visibleImages.indexOf(contextImage));
             }}
           >
-            打开
+            {t("open")}
           </button>
           <button
             role="menuitem"
@@ -3303,7 +3854,7 @@ function App() {
               void renameImage(contextImage);
             }}
           >
-            重命名
+            {t("rename")}
           </button>
           <button
             role="menuitem"
@@ -3313,7 +3864,7 @@ function App() {
               void moveImage(contextImage);
             }}
           >
-            移动
+            {t("move")}
           </button>
           <button
             role="menuitem"
@@ -3323,7 +3874,7 @@ function App() {
               void copyImage(contextImage);
             }}
           >
-            复制
+            {t("copy")}
           </button>
           <button
             role="menuitem"
@@ -3333,7 +3884,7 @@ function App() {
               void assignTagsToImage(contextImage);
             }}
           >
-            标签
+            {t("tag")}
           </button>
           <button
             role="menuitem"
@@ -3341,13 +3892,13 @@ function App() {
             onClick={() => {
               setImageContextMenu(null);
               setNotice(
-                `${contextImage.fileName}，${contextImage.format}，${formatBytes(
+                `${contextImage.fileName} · ${contextImage.format} · ${formatBytes(
                   contextImage.sizeBytes,
                 )}`,
               );
             }}
           >
-            信息
+            {t("info")}
           </button>
           <button
             className="danger"
@@ -3358,7 +3909,7 @@ function App() {
               void deleteImage(contextImage);
             }}
           >
-            删除
+            {t("delete")}
           </button>
         </div>
       ) : null}
@@ -3366,16 +3917,16 @@ function App() {
       {isCollectionEditorOpen && selectedCollection ? (
         <section className="modal-backdrop" role="presentation">
           <form
-            aria-label="编辑合集"
+            aria-label={t("editCollection")}
             className="collection-editor"
             onSubmit={(event) => void saveCollectionEditor(event)}
           >
             <header>
-              <h2>编辑合集</h2>
+              <h2>{t("editCollection")}</h2>
               <button
-                aria-label="关闭编辑"
+                aria-label={t("closeEdit")}
                 className="icon-button"
-                title="关闭编辑"
+                title={t("closeEdit")}
                 type="button"
                 onClick={() => setIsCollectionEditorOpen(false)}
               >
@@ -3384,7 +3935,7 @@ function App() {
             </header>
 
             <label>
-              <span>名称</span>
+              <span>{t("name")}</span>
               <input
                 required
                 value={collectionDraft.name}
@@ -3398,7 +3949,7 @@ function App() {
             </label>
 
             <label>
-              <span>描述</span>
+              <span>{t("description")}</span>
               <textarea
                 rows={4}
                 value={collectionDraft.description}
@@ -3412,7 +3963,7 @@ function App() {
             </label>
 
             <label>
-              <span>评分</span>
+              <span>{t("rating")}</span>
               <input
                 max={5}
                 min={0}
@@ -3433,10 +3984,10 @@ function App() {
                 type="button"
                 onClick={() => setIsCollectionEditorOpen(false)}
               >
-                取消
+                {t("cancel")}
               </button>
               <button className="primary-action" disabled={isCollectionSaving} type="submit">
-                {isCollectionSaving ? "保存中" : "保存"}
+                {isCollectionSaving ? t("saving") : t("save")}
               </button>
             </footer>
           </form>
@@ -3446,16 +3997,16 @@ function App() {
       {tagAssignmentTarget ? (
         <section className="modal-backdrop" role="presentation">
           <form
-            aria-label="设置标签"
+            aria-label={t("setTags")}
             className="tag-assignment-modal"
             onSubmit={(event) => void saveTagAssignment(event)}
           >
             <header>
               <h2>{tagAssignmentTitle}</h2>
               <button
-                aria-label="关闭标签设置"
+                aria-label={t("closeTagSettings")}
                 className="icon-button"
-                title="关闭标签设置"
+                title={t("closeTagSettings")}
                 type="button"
                 onClick={() => {
                   setTagAssignmentTarget(null);
@@ -3468,20 +4019,20 @@ function App() {
             </header>
 
             <div className="tag-assignment-field">
-              <span>标签</span>
+              <span>{t("tagsLabel")}</span>
               <button
-                aria-label="设置标签"
+                aria-label={t("setTags")}
                 aria-expanded={isTagAssignmentMenuOpen}
                 className="tag-assignment-trigger"
                 type="button"
                 onClick={() => setIsTagAssignmentMenuOpen((current) => !current)}
               >
                 {tagAssignmentIds.length > 0
-                  ? `已选择 ${tagAssignmentIds.length} 个标签`
-                  : "选择标签"}
+                  ? t("selectedTagsCount", { count: tagAssignmentIds.length })
+                  : t("selectTags")}
               </button>
               {isTagAssignmentMenuOpen ? (
-                <div className="tag-assignment-menu" role="group" aria-label="标签选项">
+                <div className="tag-assignment-menu" role="group" aria-label={t("tagOptions")}>
                   {tags.map((tag) => (
                     <label key={tag.id}>
                       <input
@@ -3504,7 +4055,7 @@ function App() {
               ) : null}
             </div>
 
-            <div className="tag-assignment-preview" aria-label="已选标签">
+            <div className="tag-assignment-preview" aria-label={t("selectedTags")}>
               {tagAssignmentIds.length > 0 ? (
                 tagAssignmentIds
                   .map((id) => tags.find((tag) => tag.id === id))
@@ -3515,7 +4066,7 @@ function App() {
                     </span>
                   ))
               ) : (
-                <small>未选择标签</small>
+                <small>{t("noTagsSelected")}</small>
               )}
             </div>
 
@@ -3528,7 +4079,7 @@ function App() {
                   setIsTagAssignmentMenuOpen(false);
                 }}
               >
-                清空
+                {t("clear")}
               </button>
               <button
                 className="secondary-action"
@@ -3539,10 +4090,10 @@ function App() {
                   setIsTagAssignmentMenuOpen(false);
                 }}
               >
-                取消
+                {t("cancel")}
               </button>
               <button className="primary-action" disabled={isTagAssignmentSaving} type="submit">
-                {isTagAssignmentSaving ? "保存中" : "保存标签"}
+                {isTagAssignmentSaving ? t("saving") : t("saveTag")}
               </button>
             </footer>
           </form>
@@ -3551,7 +4102,7 @@ function App() {
 
       {activeImage ? (
         <section
-          aria-label="图片查看器"
+          aria-label={t("imageViewer")}
           aria-modal="true"
           className="viewer-overlay"
           ref={viewerRef}
@@ -3564,29 +4115,29 @@ function App() {
                 {(viewerIndex ?? 0) + 1}/{visibleImages.length}
               </span>
             </div>
-            <div className="viewer-controls" aria-label="查看器工具栏">
+            <div className="viewer-controls" aria-label={t("viewerToolbar")}>
               <button type="button" onClick={() => resetViewerTransform("fit")}>
-                适应
+                {t("fit")}
               </button>
               <button type="button" onClick={() => resetViewerTransform("actual")}>
                 1:1
               </button>
-              <button aria-label="缩小" title="缩小" type="button" onClick={() => changeViewerZoom(-0.25)}>
+              <button aria-label={t("zoomOut")} title={t("zoomOut")} type="button" onClick={() => changeViewerZoom(-0.25)}>
                 <ZoomOut size={16} aria-hidden="true" />
               </button>
               <span className="viewer-zoom">{Math.round(viewerZoom * 100)}%</span>
-              <button aria-label="放大" title="放大" type="button" onClick={() => changeViewerZoom(0.25)}>
+              <button aria-label={t("zoomIn")} title={t("zoomIn")} type="button" onClick={() => changeViewerZoom(0.25)}>
                 <ZoomIn size={16} aria-hidden="true" />
               </button>
-              <button aria-label="旋转 90 度" title="旋转 90 度" type="button" onClick={rotateViewer}>
+              <button aria-label={t("rotate90")} title={t("rotate90")} type="button" onClick={rotateViewer}>
                 <RotateCw size={16} aria-hidden="true" />
               </button>
-              <button aria-label="全屏" title="全屏" type="button" onClick={() => void toggleFullscreen()}>
+              <button aria-label={t("fullscreen")} title={t("fullscreen")} type="button" onClick={() => void toggleFullscreen()}>
                 <Maximize2 size={16} aria-hidden="true" />
               </button>
               <button
-                aria-label={isSlideshowActive ? "暂停幻灯片" : "开始幻灯片"}
-                title={isSlideshowActive ? "暂停幻灯片" : "开始幻灯片"}
+                aria-label={isSlideshowActive ? t("pauseSlideshow") : t("startSlideshow")}
+                title={isSlideshowActive ? t("pauseSlideshow") : t("startSlideshow")}
                 type="button"
                 onClick={() => setIsSlideshowActive((current) => !current)}
               >
@@ -3597,23 +4148,23 @@ function App() {
                 )}
               </button>
               <button
-                aria-label="图片信息"
-                title="图片信息"
+                aria-label={t("imageInfo")}
+                title={t("imageInfo")}
                 type="button"
                 onClick={() => setIsInfoPanelOpen((current) => !current)}
               >
                 <Info size={16} aria-hidden="true" />
               </button>
-              <button aria-label="关闭查看器" title="关闭查看器" type="button" onClick={closeViewer}>
+              <button aria-label={t("closeViewer")} title={t("closeViewer")} type="button" onClick={closeViewer}>
                 <X size={16} aria-hidden="true" />
               </button>
             </div>
           </header>
 
           <button
-            aria-label="上一张"
+            aria-label={t("previousImage")}
             className="viewer-nav previous"
-            title="上一张"
+            title={t("previousImage")}
             type="button"
             onClick={showPreviousImage}
           >
@@ -3623,10 +4174,10 @@ function App() {
           <div className={`viewer-stage ${isInfoPanelOpen ? "with-info" : ""}`}>
             <div className={`viewer-canvas ${viewerFitMode}`}>
               {viewerImageState === "loading" ? (
-                <div className="viewer-placeholder">正在加载图片</div>
+                <div className="viewer-placeholder">{t("loadingImage")}</div>
               ) : null}
               {viewerImageState === "error" ? (
-                <div className="viewer-placeholder error">图片解码失败</div>
+                <div className="viewer-placeholder error">{t("imageDecodeFailed")}</div>
               ) : null}
               {viewerImageSrc ? (
                 <img
@@ -3646,30 +4197,30 @@ function App() {
             </div>
 
             {isInfoPanelOpen ? (
-              <aside className="viewer-info" aria-label="图片信息">
-                <h2>信息</h2>
+              <aside className="viewer-info" aria-label={t("imageInfo")}>
+                <h2>{t("info")}</h2>
                 <dl>
                   <div>
-                    <dt>格式</dt>
-                    <dd>{activeImage.format || activeImage.extension || "未知"}</dd>
+                    <dt>{t("format")}</dt>
+                    <dd>{activeImage.format || activeImage.extension || t("unknown")}</dd>
                   </div>
                   <div>
-                    <dt>尺寸</dt>
+                    <dt>{t("dimensions")}</dt>
                     <dd>
                       {(viewerAsset?.width || activeImage.width) &&
                       (viewerAsset?.height || activeImage.height)
                         ? `${viewerAsset?.width || activeImage.width} x ${
                             viewerAsset?.height || activeImage.height
                           }`
-                        : "未知"}
+                        : t("unknown")}
                     </dd>
                   </div>
                   <div>
-                    <dt>大小</dt>
+                    <dt>{t("storageSize")}</dt>
                     <dd>{formatBytes(activeImage.sizeBytes)}</dd>
                   </div>
                   <div>
-                    <dt>路径</dt>
+                    <dt>{t("path")}</dt>
                     <dd title={activeImage.path}>{activeImage.path}</dd>
                   </div>
                 </dl>
@@ -3678,9 +4229,9 @@ function App() {
           </div>
 
           <button
-            aria-label="下一张"
+            aria-label={t("nextImage")}
             className="viewer-nav next"
-            title="下一张"
+            title={t("nextImage")}
             type="button"
             onClick={showNextImage}
           >
@@ -3731,23 +4282,27 @@ function DuplicateGroupCard({
   group,
   onDelete,
   onOpen,
+  t,
 }: {
   group: DuplicateGroup;
   onDelete: () => void;
   onOpen: (image: ImageRecord) => void;
+  t: Translator;
 }) {
   return (
     <article className="duplicate-group-card">
       <header>
-        <span>{group.kind === "exact" ? "完全重复" : `相似 ${group.score}`}</span>
+        <span>
+          {group.kind === "exact" ? t("exactDuplicate") : t("similarDuplicate", { score: group.score })}
+        </span>
         <button className="danger" type="button" onClick={onDelete}>
-          删除其余
+          {t("deleteRest")}
         </button>
       </header>
       <div>
         {group.images.map((image, index) => (
           <button key={image.id} type="button" onClick={() => onOpen(image)}>
-            <span>{index === 0 ? "保留" : "候选"}</span>
+            <span>{index === 0 ? t("keep") : t("candidate")}</span>
             <strong>{image.fileName}</strong>
             <small>{formatBytes(image.sizeBytes)}</small>
           </button>
@@ -3799,9 +4354,10 @@ function compareCollections(
   left: Collection,
   right: Collection,
   sortKey: CollectionSortKey,
+  language: AppLanguage,
 ): number {
   if (sortKey === "name") {
-    return left.name.localeCompare(right.name, "zh-CN");
+    return left.name.localeCompare(right.name, language);
   }
 
   if (sortKey === "images") {
@@ -3819,45 +4375,61 @@ function collectionViewTitle(
   activeView: NavigationView,
   selectedTagFilterId: string,
   tags: PhotoTag[],
+  t: Translator,
 ): string {
   if (selectedTagFilterId !== "all") {
     const tag = tags.find((item) => item.id === selectedTagFilterId);
-    return tag ? `标签：${tag.name}` : "标签筛选";
+    return tag ? t("tagFilterTitle", { name: tag.name }) : t("tagFilterFallback");
   }
 
   if (activeView === "favorites") {
-    return "收藏合集";
+    return t("favoritesCollections");
   }
 
   if (activeView === "recent") {
-    return "最近浏览";
+    return t("recentViewed");
   }
 
-  return "全部合集";
+  return t("allCollections");
 }
 
-function importProgressPhaseText(phase: ImportFolderProgress["phase"]): string {
+function importProgressPhaseText(phase: ImportFolderProgress["phase"], t: Translator): string {
   if (phase === "completed") {
-    return "导入完成";
+    return t("importDone");
   }
 
   if (phase === "imported") {
-    return "已导入";
+    return t("imported");
   }
 
   if (phase === "skipped") {
-    return "已跳过";
+    return t("skipped");
   }
 
   if (phase === "preparing") {
-    return "准备导入";
+    return t("preparingImport");
   }
 
-  return "正在扫描";
+  return t("scanning");
 }
 
-function importProgressUnit(_phase: ImportFolderProgress["phase"]): string {
-  return "目录";
+function importProgressUnit(_phase: ImportFolderProgress["phase"], t: Translator): string {
+  return t("directories");
+}
+
+function formatDataToolNotice(
+  command: "backup_database" | "rebuild_index" | "export_library_data",
+  result: DataFileResult,
+  t: Translator,
+): string {
+  const messageKey =
+    command === "backup_database"
+      ? "backupCreated"
+      : command === "rebuild_index"
+        ? "indexRebuilt"
+        : "libraryExported";
+  const message = t(messageKey);
+  return result.path ? `${message}: ${result.path}` : message;
 }
 
 function formatBytes(value: number): string {
@@ -3877,8 +4449,8 @@ function formatBytes(value: number): string {
   return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("zh-CN", {
+function formatDate(value: string, language: AppLanguage): string {
+  return new Intl.DateTimeFormat(language, {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
